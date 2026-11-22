@@ -1,307 +1,34 @@
-name: Auto-Generate and Build DCC-E2 APK
+name: Build Redesigned DCC Android APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
         with:
+          distribution: temurin
           java-version: '17'
-          distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.9'
 
-      - name: Generate DCC-E2 Android Project
-        run: |
-          mkdir -p app/src/main/java/com/dcc/enigma2 app/src/main/res/layout
+      - name: Build redesigned debug APK
+        run: gradle -p DCCAndroid :app:assembleDebug
 
-          cat << 'EOF' > settings.gradle
-          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories { google(); mavenCentral() }
-          }
-          rootProject.name = "DCC_E2_Android"
-          include ':app'
-          EOF
-
-          cat << 'EOF' > build.gradle
-          plugins {
-              id 'com.android.application' version '8.5.2' apply false
-              id 'org.jetbrains.kotlin.android' version '1.9.24' apply false
-          }
-          EOF
-
-          cat << 'EOF' > gradle.properties
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-          android.useAndroidX=true
-          EOF
-
-          cat << 'EOF' > app/build.gradle
-          plugins {
-              id 'com.android.application'
-              id 'org.jetbrains.kotlin.android'
-          }
-          android {
-              namespace 'com.dcc.enigma2'
-              compileSdk 34
-              defaultConfig {
-                  applicationId "com.dcc.enigma2"
-                  minSdk 24
-                  targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
-              }
-              compileOptions {
-                  sourceCompatibility JavaVersion.VERSION_17
-                  targetCompatibility JavaVersion.VERSION_17
-              }
-              kotlinOptions { jvmTarget = '17' }
-          }
-          dependencies {
-              implementation 'androidx.core:core-ktx:1.13.1'
-              implementation 'androidx.appcompat:appcompat:1.7.0'
-              implementation 'com.google.android.material:material:1.12.0'
-              implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
-              implementation 'commons-net:commons-net:3.13.0'
-          }
-          EOF
-
-          cat << 'EOF' > app/src/main/AndroidManifest.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-              <application
-                  android:label="DCC-E2"
-                  android:theme="@style/Theme.MaterialComponents.DayNight.DarkActionBar"
-                  android:usesCleartextTraffic="true">
-                  <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          EOF
-
-          cat << 'EOF' > app/src/main/res/layout/activity_main.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent"
-              android:orientation="vertical" android:padding="12dp" android:background="#121212">
-              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-                  <EditText android:id="@+id/etIp" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="2" android:text="192.168.1.100" android:textColor="#FFFFFF" />
-                  <EditText android:id="@+id/etUser" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="root" android:textColor="#FFFFFF" />
-                  <EditText android:id="@+id/etPass" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1.2" android:text="dreambox" android:textColor="#FFFFFF" android:inputType="textPassword" />
-              </LinearLayout>
-              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
-                  <Button android:id="@+id/btnReconnect" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Reconnect" />
-                  <TextView android:id="@+id/tvStatus" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:paddingStart="12dp" android:text="FTP: OFF | Telnet: OFF" android:textColor="#FF5252" android:textStyle="bold" />
-              </LinearLayout>
-              <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content">
-                  <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal">
-                      <Button android:id="@+id/btnListTmp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="List /tmp" />
-                      <Button android:id="@+id/btnUploadIpk" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Upload .IPK/.DEB" />
-                      <Button android:id="@+id/btnInstallIpk" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Install /tmp/*" />
-                      <Button android:id="@+id/btnRestartGui" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Restart E2" />
-                      <Button android:id="@+id/btnReboot" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Reboot" />
-                  </LinearLayout>
-              </HorizontalScrollView>
-              <ScrollView android:id="@+id/scrollConsole" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:background="#000000" android:padding="8dp">
-                  <TextView android:id="@+id/tvConsole" android:layout_width="match_parent" android:layout_height="wrap_content" android:fontFamily="monospace" android:textColor="#00E676" android:textSize="12sp" android:text="DCC-E2 Android Ready.\n" />
-              </ScrollView>
-              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
-                  <EditText android:id="@+id/etCommand" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:hint="Telnet command..." android:textColor="#FFFFFF" android:textColorHint="#888888" android:fontFamily="monospace" android:singleLine="true" />
-                  <Button android:id="@+id/btnSendCmd" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Send" />
-              </LinearLayout>
-          </LinearLayout>
-          EOF
-
-          cat << 'EOF' > app/src/main/java/com/dcc/enigma2/MainActivity.kt
-          package com.dcc.enigma2
-
-          import android.graphics.Color
-          import android.net.Uri
-          import android.os.Bundle
-          import android.provider.OpenableColumns
-          import android.view.View
-          import android.widget.*
-          import androidx.activity.result.contract.ActivityResultContracts
-          import androidx.appcompat.app.AppCompatActivity
-          import androidx.lifecycle.lifecycleScope
-          import kotlinx.coroutines.*
-          import org.apache.commons.net.ftp.FTP
-          import org.apache.commons.net.ftp.FTPClient
-          import org.apache.commons.net.telnet.TelnetClient
-          import java.io.InputStream
-          import java.io.OutputStream
-
-          class MainActivity : AppCompatActivity() {
-              private lateinit var etIp: EditText
-              private lateinit var etUser: EditText
-              private lateinit var etPass: EditText
-              private lateinit var tvStatus: TextView
-              private lateinit var tvConsole: TextView
-              private lateinit var scrollConsole: ScrollView
-              private lateinit var etCommand: EditText
-              private var ftpClient = FTPClient()
-              private var telnetClient = TelnetClient()
-              private var telnetOut: OutputStream? = null
-              private var telnetJob: Job? = null
-
-              private val pickFileLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-                  uri?.let { uploadFileToTmp(it) }
-              }
-
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  setContentView(R.layout.activity_main)
-                  etIp = findViewById(R.id.etIp)
-                  etUser = findViewById(R.id.etUser)
-                  etPass = findViewById(R.id.etPass)
-                  tvStatus = findViewById(R.id.tvStatus)
-                  tvConsole = findViewById(R.id.tvConsole)
-                  scrollConsole = findViewById(R.id.scrollConsole)
-                  etCommand = findViewById(R.id.etCommand)
-
-                  findViewById<Button>(R.id.btnReconnect).setOnClickListener { connectAll() }
-                  findViewById<Button>(R.id.btnSendCmd).setOnClickListener {
-                      val cmd = etCommand.text.toString()
-                      if (cmd.isNotBlank()) { sendTelnetCommand(cmd); etCommand.text.clear() }
-                  }
-                  findViewById<Button>(R.id.btnListTmp).setOnClickListener { listFtpDirectory("/tmp") }
-                  findViewById<Button>(R.id.btnUploadIpk).setOnClickListener { pickFileLauncher.launch("*/*") }
-                  findViewById<Button>(R.id.btnInstallIpk).setOnClickListener {
-                      sendTelnetCommand("opkg install --force-overwrite /tmp/*.ipk 2>/dev/null || dpkg -i /tmp/*.deb")
-                  }
-                  findViewById<Button>(R.id.btnRestartGui).setOnClickListener { sendTelnetCommand("init 4 && sleep 2 && init 3") }
-                  findViewById<Button>(R.id.btnReboot).setOnClickListener { sendTelnetCommand("reboot") }
-              }
-
-              private fun connectAll() {
-                  val ip = etIp.text.toString().trim()
-                  val user = etUser.text.toString().trim()
-                  val pass = etPass.text.toString().trim()
-                  log("Connecting to $ip...")
-                  lifecycleScope.launch(Dispatchers.IO) {
-                      var ftpOk = false
-                      var telnetOk = false
-                      try {
-                          if (ftpClient.isConnected) ftpClient.disconnect()
-                          ftpClient = FTPClient().apply { connectTimeout = 5000 }
-                          ftpClient.connect(ip, 21)
-                          ftpOk = ftpClient.login(user, pass)
-                          ftpClient.enterLocalPassiveMode()
-                          ftpClient.setFileType(FTP.BINARY_FILE_TYPE)
-                          if (ftpOk) log("[FTP] Connected as $user")
-                      } catch (e: Exception) { log("[FTP Error] ${e.message}") }
-
-                      try {
-                          telnetJob?.cancel()
-                          if (telnetClient.isConnected) telnetClient.disconnect()
-                          telnetClient = TelnetClient().apply { connectTimeout = 5000 }
-                          telnetClient.connect(ip, 23)
-                          telnetOut = telnetClient.outputStream
-                          telnetOk = telnetClient.isConnected
-                          startTelnetReader(telnetClient.inputStream, user, pass)
-                      } catch (e: Exception) { log("[Telnet Error] ${e.message}") }
-
-                      withContext(Dispatchers.Main) {
-                          tvStatus.text = "FTP: ${if (ftpOk) "OK" else "ERR"} | Telnet: ${if (telnetOk) "OK" else "ERR"}"
-                          tvStatus.setTextColor(if (ftpOk && telnetOk) Color.GREEN else Color.RED)
-                      }
-                  }
-              }
-
-              private fun startTelnetReader(input: InputStream, user: String, pass: String) {
-                  telnetJob = lifecycleScope.launch(Dispatchers.IO) {
-                      val buffer = ByteArray(1024)
-                      var sentUser = false
-                      var sentPass = false
-                      try {
-                          while (isActive && telnetClient.isConnected) {
-                              val len = input.read(buffer)
-                              if (len <= 0) break
-                              val text = String(buffer, 0, len)
-                              logRaw(text)
-                              if (!sentUser && text.contains("login:", ignoreCase = true)) { sendTelnetCommand(user); sentUser = true }
-                              else if (!sentPass && text.contains("password:", ignoreCase = true)) { sendTelnetCommand(pass); sentPass = true }
-                          }
-                      } catch (e: Exception) { log("[Telnet Disconnected] ${e.message}") }
-                  }
-              }
-
-              private fun sendTelnetCommand(cmd: String) {
-                  lifecycleScope.launch(Dispatchers.IO) {
-                      try { telnetOut?.apply { write("$cmd\r\n".toByteArray()); flush() } }
-                      catch (e: Exception) { log("[Telnet Send Error] ${e.message}") }
-                  }
-              }
-
-              private fun listFtpDirectory(path: String) {
-                  lifecycleScope.launch(Dispatchers.IO) {
-                      try {
-                          if (!ftpClient.isConnected) { log("[FTP] Not connected."); return@launch }
-                          val files = ftpClient.listFiles(path)
-                          log("--- FTP: $path ---")
-                          files.forEach { log("${it.name} (${if (it.isDirectory) "DIR" else "${it.size} B"})") }
-                      } catch (e: Exception) { log("[FTP Error] ${e.message}") }
-                  }
-              }
-
-              private fun uploadFileToTmp(uri: Uri) {
-                  lifecycleScope.launch(Dispatchers.IO) {
-                      try {
-                          if (!ftpClient.isConnected) { log("[FTP] Not connected."); return@launch }
-                          val fileName = getFileName(uri) ?: "package.ipk"
-                          log("[FTP] Uploading $fileName to /tmp ...")
-                          contentResolver.openInputStream(uri)?.use { inputStream ->
-                              ftpClient.changeWorkingDirectory("/tmp")
-                              if (ftpClient.storeFile(fileName, inputStream)) {
-                                  ftpClient.sendSiteCommand("CHMOD 755 /tmp/$fileName")
-                                  log("[FTP] Upload complete!")
-                              } else { log("[FTP] Upload failed: ${ftpClient.replyString}") }
-                          }
-                      } catch (e: Exception) { log("[FTP Upload Error] ${e.message}") }
-                  }
-              }
-
-              private fun getFileName(uri: Uri): String? {
-                  contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                      if (cursor.moveToFirst()) {
-                          val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                          if (idx >= 0) return cursor.getString(idx)
-                      }
-                  }
-                  return uri.lastPathSegment
-              }
-
-              private fun log(msg: String) = logRaw("$msg\n")
-              private fun logRaw(msg: String) {
-                  runOnUiThread {
-                      tvConsole.append(msg)
-                      scrollConsole.post { scrollConsole.fullScroll(View.FOCUS_DOWN) }
-                  }
-              }
-          }
-          EOF
-
-      - name: Build Debug APK
-        run: gradle assembleDebug
-
-      - name: Upload APK
+      - name: Upload redesigned APK
         uses: actions/upload-artifact@v4
         with:
-          name: DCC-E2-Android-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: DCC-Android-redesign
+          path: DCCAndroid/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
