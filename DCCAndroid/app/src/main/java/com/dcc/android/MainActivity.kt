@@ -3,6 +3,7 @@ package com.dcc.android
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -102,7 +103,7 @@ private fun DccApp() {
                         onOpenTools = { selected = 2 }
                     )
                     1 -> DevicesScreen()
-                    2 -> ToolsScreen(onAction = { message = "$it selected. This operation is not implemented yet."; selected = 0 })
+                    2 -> ToolsScreen()
                     3 -> SettingsScreen(
                         notificationsEnabled = notificationsEnabled,
                         onNotificationsChange = { notificationsEnabled = it },
@@ -124,9 +125,7 @@ private fun HomeScreen(message: String, onReconnect: () -> Unit, onFindDevice: (
             Text("Your receiver setup at a glance", color = Muted)
         }
         ConnectionHero(onReconnect)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SectionHeading("DEVICES", "3 saved")
-        }
+        Row(verticalAlignment = Alignment.CenterVertically) { SectionHeading("DEVICES", "3 saved") }
         DeviceCard("This phone", "192.168.1.12", "Controller", "📱", true)
         DeviceCard("Dreambox", "192.168.1.4", "Receiver", "📺", false)
         DeviceCard("Router", "192.168.1.254", "Gateway", "📡", false)
@@ -150,7 +149,7 @@ private fun HomeScreen(message: String, onReconnect: () -> Unit, onFindDevice: (
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             shape = RoundedCornerShape(20.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Border)
+            border = BorderStroke(1.dp, Border)
         ) {
             Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFFEAF0FF)), contentAlignment = Alignment.Center) {
@@ -161,9 +160,7 @@ private fun HomeScreen(message: String, onReconnect: () -> Unit, onFindDevice: (
                     Text("Quick tools", fontWeight = FontWeight.Bold, color = Navy)
                     Text("Connection info and receiver utilities", color = Muted, style = MaterialTheme.typography.bodySmall)
                 }
-                IconButton(onClick = onOpenTools) {
-                    Icon(Icons.Default.ArrowForward, contentDescription = "Open tools", tint = Blue)
-                }
+                IconButton(onClick = onOpenTools) { Icon(Icons.Default.ArrowForward, contentDescription = "Open tools", tint = Blue) }
             }
         }
     }
@@ -194,9 +191,7 @@ private fun ConnectionHero(onReconnect: () -> Unit) {
             HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Dreambox · 192.168.1.4", color = Color.White, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                TextButton(onClick = onReconnect, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) {
-                    Text("Connect")
-                }
+                TextButton(onClick = onReconnect, colors = ButtonDefaults.textButtonColors(contentColor = Color.White)) { Text("Connect") }
             }
         }
     }
@@ -222,16 +217,41 @@ private fun DevicesScreen() {
 }
 
 @Composable
-private fun ToolsScreen(onAction: (String) -> Unit) {
+private fun ToolsScreen() {
+    var selectedTool by remember { mutableStateOf<String?>(null) }
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Navy)
             Text("Receiver utilities", color = Muted)
         }
-        ToolActionCard("Connection details", "View receiver connection information", onClick = { onAction("Connection details") })
-        ToolActionCard("FTP browser", "Browse files on your Dreambox", onClick = { onAction("FTP browser") })
-        ToolActionCard("Telnet console", "Open a receiver terminal session", onClick = { onAction("Telnet console") })
-        ToolActionCard("Run script", "Run a receiver maintenance script", onClick = { onAction("Run script") })
+        ToolActionCard("Connection details", "View receiver connection information") { selectedTool = "Connection details" }
+        ToolActionCard("FTP browser", "Browse files on your Dreambox") { selectedTool = "FTP browser" }
+        ToolActionCard("Telnet console", "Open a receiver terminal session") { selectedTool = "Telnet console" }
+        ToolActionCard("Run script", "Run a receiver maintenance script") { selectedTool = "Run script" }
+    }
+
+    selectedTool?.let { tool ->
+        val isConnectionDetails = tool == "Connection details"
+        AlertDialog(
+            onDismissRequest = { selectedTool = null },
+            title = { Text(tool, color = Navy, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    if (isConnectionDetails) {
+                        "Saved receiver: Dreambox\nAddress: 192.168.1.4\nStatus: Not connected\n\nThe displayed address is sample app data."
+                    } else {
+                        "$tool is not connected because receiver communication has not been configured in this app yet."
+                    },
+                    color = Muted
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedTool = null }) { Text("OK") }
+            },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 }
 
@@ -247,14 +267,14 @@ private fun SettingsScreen(
             Text("Settings", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Navy)
             Text("Personalize your DCC experience", color = Muted)
         }
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Border)) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
             Column {
                 SettingSwitch("Notifications", "Show connection status notifications", notificationsEnabled, onNotificationsChange)
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = Canvas)
                 SettingSwitch("Auto reconnect", "Reconnect when the receiver is available", autoReconnectEnabled, onAutoReconnectChange)
             }
         }
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Border)) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("About DCC", fontWeight = FontWeight.Bold, color = Navy)
                 Text("Dreambox Control Center · Version 2.0", color = Muted, style = MaterialTheme.typography.bodySmall)
@@ -264,7 +284,7 @@ private fun SettingsScreen(
 }
 
 @Composable
-private fun SectionHeading(title: String, detail: String) {
+private fun RowScope.SectionHeading(title: String, detail: String) {
     Text(title, color = Muted, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
     Text(detail, color = Muted, style = MaterialTheme.typography.labelSmall)
 }
@@ -287,7 +307,7 @@ private fun ToolActionCard(title: String, description: String, onClick: () -> Un
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(18.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border)
+        border = BorderStroke(1.dp, Border)
     ) {
         Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(Color(0xFFEAF0FF)), contentAlignment = Alignment.Center) {
@@ -309,7 +329,7 @@ private fun DeviceCard(name: String, address: String, type: String, emoji: Strin
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(20.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border)
+        border = BorderStroke(1.dp, Border)
     ) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(50.dp).clip(RoundedCornerShape(16.dp)).background(if (primary) Color(0xFFEAF0FF) else Color(0xFFEAF7F1)), contentAlignment = Alignment.Center) {
@@ -333,7 +353,7 @@ private fun ServiceCard(title: String, detail: String, modifier: Modifier = Modi
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(18.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border)
+        border = BorderStroke(1.dp, Border)
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
