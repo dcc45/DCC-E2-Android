@@ -1,15 +1,23 @@
 package com.dcc.android
 
 import android.content.res.Configuration
-import androidx.compose.foundation.isSystemInDarkTheme
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
@@ -22,7 +30,8 @@ fun DccTheme(content: @Composable () -> Unit) {
     val preferences = context.getSharedPreferences("dcc_receiver", android.content.Context.MODE_PRIVATE)
     val mode = preferences.getString("theme_mode", "system") ?: "system"
     val accent = preferences.getString("theme_accent", "blue") ?: "blue"
-    val background = preferences.getString("theme_background", "light") ?: "light"
+    val backgroundName = preferences.getString("theme_background", "light") ?: "light"
+    val wallpaperUri = preferences.getString("theme_wallpaper", "") ?: ""
 
     val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
     val useDark = when (mode) {
@@ -39,7 +48,7 @@ fun DccTheme(content: @Composable () -> Unit) {
         else -> DccBlue
     }
 
-    val backgroundColor = when (background) {
+    val backgroundColor = when (backgroundName) {
         "navy" -> if (useDark) Color(0xFF07111F) else Color(0xFF0E2948)
         "blue" -> if (useDark) Color(0xFF101F32) else Color(0xFFEAF1FF)
         "grey" -> if (useDark) Color(0xFF17191C) else Color(0xFFF1F2F4)
@@ -64,7 +73,7 @@ fun DccTheme(content: @Composable () -> Unit) {
 
     val darkColors = darkColorScheme(
         primary = accentColor,
-        onPrimary = if (accent == "green") Color(0xFF06231A) else Color.White,
+        onPrimary = Color.White,
         primaryContainer = accentColor.copy(alpha = 0.28f),
         onPrimaryContainer = Color(0xFFEAF0F7),
         secondary = accentColor,
@@ -85,9 +94,29 @@ fun DccTheme(content: @Composable () -> Unit) {
         extraLarge = RoundedCornerShape(28.dp)
     )
 
-    MaterialTheme(
-        colorScheme = if (useDark) darkColors else lightColors,
-        shapes = shapes,
-        content = content
-    )
+    val wallpaperBitmap = remember(wallpaperUri) {
+        if (wallpaperUri.isBlank()) null
+        else runCatching {
+            context.contentResolver.openInputStream(Uri.parse(wallpaperUri)).use { input ->
+                BitmapFactory.decodeStream(input)
+            }
+        }.getOrNull()
+    }
+
+    MaterialTheme(colorScheme = if (useDark) darkColors else lightColors, shapes = shapes) {
+        Box(Modifier.fillMaxSize()) {
+            if (wallpaperBitmap != null) {
+                Image(
+                    bitmap = wallpaperBitmap.asImageBitmap(),
+                    contentDescription = "Custom app wallpaper",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Box(Modifier.fillMaxSize().background(backgroundColor.copy(alpha = if (useDark) 0.58f else 0.72f)))
+            } else {
+                Box(Modifier.fillMaxSize().background(backgroundColor))
+            }
+            content()
+        }
+    }
 }
