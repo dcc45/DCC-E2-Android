@@ -48,7 +48,7 @@ private val Border = Color(0xFFE5EBF2)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { DccApp() }
+        setContent { DccTheme { DccApp() } }
     }
 }
 
@@ -91,144 +91,142 @@ private fun DccApp() {
     }
 
     BackHandler(enabled = fullscreen) { fullscreen = false }
-    MaterialTheme(colorScheme = lightColorScheme(primary = Blue, background = Canvas, surface = Color.White)) {
-        if (fullscreen) {
-            Box(Modifier.fillMaxSize().background(Color.Black)) {
-                if (streamUrl.isNotBlank()) PlayerSurface(player, Modifier.fillMaxSize(), resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM)
-                IconButton(
-                    onClick = { fullscreen = false },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).clip(CircleShape).background(Color.Black.copy(alpha = .55f))
-                ) { Text("×", color = Color.White, fontSize = 28.sp) }
-                Text(
-                    "${if (isPlaying) "LIVE" else "STREAM"}  ·  Dreambox",
-                    color = Color.White, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.align(Alignment.TopStart).padding(20.dp)
+    if (fullscreen) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            if (streamUrl.isNotBlank()) PlayerSurface(player, Modifier.fillMaxSize(), resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM)
+            IconButton(
+                onClick = { fullscreen = false },
+                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).clip(CircleShape).background(Color.Black.copy(alpha = .55f))
+            ) { Text("×", color = Color.White, fontSize = 28.sp) }
+            Text(
+                "${if (isPlaying) "LIVE" else "STREAM"}  ·  Dreambox",
+                color = Color.White, fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.TopStart).padding(20.dp)
+            )
+            TextButton(onClick = { fullscreen = false; selected = 0 }, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
+                Text("MINIMIZE", color = Color.White)
+            }
+        }
+    } else {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                val title = when (selected) {
+                    2 -> "Live Stream"
+                    5 -> "PVR / Recordings"
+                    6 -> "Listen Mode"
+                    else -> "DCC · Dreambox Control Center"
+                }
+                TopAppBar(
+                    title = { Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
                 )
-                TextButton(onClick = { fullscreen = false; selected = 0 }, modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
-                    Text("MINIMIZE", color = Color.White)
+            },
+            bottomBar = {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                    NavigationBarItem(selected == 0, { selected = 0 }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Home") })
+                    NavigationBarItem(selected == 1, { selected = 1 }, icon = { Icon(Icons.Default.Devices, null) }, label = { Text("Devices") })
+                    NavigationBarItem(selected == 2, { selected = 2 }, icon = { Icon(Icons.Default.LiveTv, null) }, label = { Text("Stream") })
+                    NavigationBarItem(selected == 3, { selected = 3 }, icon = { Icon(Icons.Default.Terminal, null) }, label = { Text("Tools") })
+                    NavigationBarItem(selected == 4, { selected = 4 }, icon = { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
+                    NavigationBarItem(selected == 5, { selected = 5 }, icon = { Icon(Icons.Default.VideoLibrary, null) }, label = { Text("PVR") })
+                    NavigationBarItem(selected == 6, { selected = 6 }, icon = { Icon(Icons.Default.Headphones, null) }, label = { Text("Listen") })
                 }
             }
-        } else {
-            Scaffold(
-                containerColor = Canvas,
-                topBar = {
-                    val title = when (selected) {
-                        2 -> "Live Stream"
-                        5 -> "PVR / Recordings"
-                        6 -> "Listen Mode"
-                        else -> "DCC · Dreambox Control Center"
-                    }
-                    TopAppBar(
-                        title = { Text(title, color = Navy, fontWeight = FontWeight.Bold) },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+        ) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                if (streamUrl.isNotBlank() && selected != 2) {
+                    MiniPlayer(
+                        player = player,
+                        playing = isPlaying,
+                        onExpand = { selected = 2 },
+                        onClose = { player.stop(); streamUrl = ""; isPlaying = false }
                     )
-                },
-                bottomBar = {
-                    NavigationBar(containerColor = Color.White) {
-                        NavigationBarItem(selected == 0, { selected = 0 }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Home") })
-                        NavigationBarItem(selected == 1, { selected = 1 }, icon = { Icon(Icons.Default.Devices, null) }, label = { Text("Devices") })
-                        NavigationBarItem(selected == 2, { selected = 2 }, icon = { Icon(Icons.Default.LiveTv, null) }, label = { Text("Stream") })
-                        NavigationBarItem(selected == 3, { selected = 3 }, icon = { Icon(Icons.Default.Terminal, null) }, label = { Text("Tools") })
-                        NavigationBarItem(selected == 4, { selected = 4 }, icon = { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
-                        NavigationBarItem(selected == 5, { selected = 5 }, icon = { Icon(Icons.Default.VideoLibrary, null) }, label = { Text("PVR") })
-                        NavigationBarItem(selected == 6, { selected = 6 }, icon = { Icon(Icons.Default.Headphones, null) }, label = { Text("Listen") })
-                    }
                 }
-            ) { padding ->
-                Column(Modifier.fillMaxSize().padding(padding)) {
-                    if (streamUrl.isNotBlank() && selected != 2) {
-                        MiniPlayer(
-                            player = player,
-                            playing = isPlaying,
-                            onExpand = { selected = 2 },
-                            onClose = { player.stop(); streamUrl = ""; isPlaying = false }
+                Column(
+                    Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    when (selected) {
+                        0 -> HomeScreen(
+                            receiverIp = receiverIp,
+                            onOpenSettings = { selected = 4 },
+                            onOpenDevices = { selected = 1 },
+                            onOpenStream = { selected = 2 },
+                            onOpenTools = { selected = 3 }
                         )
-                    }
-                    Column(
-                        Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        when (selected) {
-                            0 -> HomeScreen(
-                                receiverIp = receiverIp,
-                                onOpenSettings = { selected = 4 },
-                                onOpenDevices = { selected = 1 },
-                                onOpenStream = { selected = 2 },
-                                onOpenTools = { selected = 3 }
-                            )
-                            1 -> DevicesScreen(receiverIp)
-                            2 -> StreamScreen(
-                                player = player, streamUrl = streamUrl, urlInput = urlInput,
-                                onUrlChange = { urlInput = it }, playing = isPlaying,
-                                error = error, onErrorDismiss = { error = null },
-                                onPlay = {
-                                    val candidate = urlInput.trim()
-                                    val uri = runCatching { Uri.parse(candidate) }.getOrNull()
-                                    if (uri == null || uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
-                                        error = "Enter a valid HTTP or HTTPS stream URL from your Dreambox."
-                                    } else {
-                                        error = null
-                                        streamUrl = candidate
-                                        listenUrl = ""
-                                        player.setMediaItem(MediaItem.fromUri(uri))
-                                        player.prepare()
-                                        player.play()
-                                    }
-                                },
-                                onToggle = { if (isPlaying) player.pause() else if (streamUrl.isNotBlank()) player.play() else error = "Enter a stream URL to start playback." },
-                                onFullscreen = { fullscreen = true },
-                                onMinimize = { selected = 0 }
-                            )
-                            3 -> ToolsScreen(AppLanguage.ENGLISH, receiverIp, receiverUser, receiverPassword)
-                            4 -> ReceiverSettingsScreen(
-                                ip = receiverIp,
-                                onIpChange = { receiverIp = it; savedMessage = null },
-                                username = receiverUser,
-                                onUsernameChange = { receiverUser = it; savedMessage = null },
-                                password = receiverPassword,
-                                onPasswordChange = { receiverPassword = it; savedMessage = null },
-                                savedMessage = savedMessage,
-                                context = context,
-                                preferences = preferences,
-                                onSave = {
-                                    preferences.edit()
-                                        .putString("ip", receiverIp.trim())
-                                        .putString("user", receiverUser.trim())
-                                        .putString("password", receiverPassword)
-                                        .apply()
-                                    receiverIp = receiverIp.trim()
-                                    receiverUser = receiverUser.trim()
-                                    savedMessage = "Receiver details saved on this device."
+                        1 -> DevicesScreen(receiverIp)
+                        2 -> StreamScreen(
+                            player = player, streamUrl = streamUrl, urlInput = urlInput,
+                            onUrlChange = { urlInput = it }, playing = isPlaying,
+                            error = error, onErrorDismiss = { error = null },
+                            onPlay = {
+                                val candidate = urlInput.trim()
+                                val uri = runCatching { Uri.parse(candidate) }.getOrNull()
+                                if (uri == null || uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
+                                    error = "Enter a valid HTTP or HTTPS stream URL from your Dreambox."
+                                } else {
+                                    error = null
+                                    streamUrl = candidate
+                                    listenUrl = ""
+                                    player.setMediaItem(MediaItem.fromUri(uri))
+                                    player.prepare()
+                                    player.play()
                                 }
-                            )
-                            5 -> PvrScreen(receiverIp, receiverUser, receiverPassword)
-                            6 -> ListenScreen(
-                                player = player,
-                                listenUrl = listenUrl,
-                                urlInput = listenUrlInput,
-                                playing = isPlaying,
-                                error = listenError,
-                                onUrlChange = { listenUrlInput = it },
-                                onPlay = {
-                                    val candidate = listenUrlInput.trim()
-                                    val uri = runCatching { Uri.parse(candidate) }.getOrNull()
-                                    if (uri == null || uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
-                                        listenError = "Enter a valid HTTP or HTTPS audio stream URL."
-                                    } else {
-                                        listenError = null
-                                        listenUrl = candidate
-                                        streamUrl = ""
-                                        player.stop()
-                                        player.setMediaItem(MediaItem.fromUri(uri))
-                                        player.prepare()
-                                        player.play()
-                                    }
-                                },
-                                onToggle = { if (isPlaying) player.pause() else if (listenUrl.isNotBlank()) player.play() else listenError = "Enter an audio stream URL to start listening." },
-                                onStop = { player.stop(); listenUrl = ""; isPlaying = false },
-                                onErrorDismiss = { listenError = null }
-                            )
-                        }
+                            },
+                            onToggle = { if (isPlaying) player.pause() else if (streamUrl.isNotBlank()) player.play() else error = "Enter a stream URL to start playback." },
+                            onFullscreen = { fullscreen = true },
+                            onMinimize = { selected = 0 }
+                        )
+                        3 -> ToolsScreen(AppLanguage.ENGLISH, receiverIp, receiverUser, receiverPassword)
+                        4 -> ReceiverSettingsScreen(
+                            ip = receiverIp,
+                            onIpChange = { receiverIp = it; savedMessage = null },
+                            username = receiverUser,
+                            onUsernameChange = { receiverUser = it; savedMessage = null },
+                            password = receiverPassword,
+                            onPasswordChange = { receiverPassword = it; savedMessage = null },
+                            savedMessage = savedMessage,
+                            context = context,
+                            preferences = preferences,
+                            onSave = {
+                                preferences.edit()
+                                    .putString("ip", receiverIp.trim())
+                                    .putString("user", receiverUser.trim())
+                                    .putString("password", receiverPassword)
+                                    .apply()
+                                receiverIp = receiverIp.trim()
+                                receiverUser = receiverUser.trim()
+                                savedMessage = "Receiver details saved on this device."
+                            }
+                        )
+                        5 -> PvrScreen(receiverIp, receiverUser, receiverPassword)
+                        6 -> ListenScreen(
+                            player = player,
+                            listenUrl = listenUrl,
+                            urlInput = listenUrlInput,
+                            playing = isPlaying,
+                            error = listenError,
+                            onUrlChange = { listenUrlInput = it },
+                            onPlay = {
+                                val candidate = listenUrlInput.trim()
+                                val uri = runCatching { Uri.parse(candidate) }.getOrNull()
+                                if (uri == null || uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
+                                    listenError = "Enter a valid HTTP or HTTPS audio stream URL."
+                                } else {
+                                    listenError = null
+                                    listenUrl = candidate
+                                    streamUrl = ""
+                                    player.stop()
+                                    player.setMediaItem(MediaItem.fromUri(uri))
+                                    player.prepare()
+                                    player.play()
+                                }
+                            },
+                            onToggle = { if (isPlaying) player.pause() else if (listenUrl.isNotBlank()) player.play() else listenError = "Enter an audio stream URL to start listening." },
+                            onStop = { player.stop(); listenUrl = ""; isPlaying = false },
+                            onErrorDismiss = { listenError = null }
+                        )
                     }
                 }
             }
