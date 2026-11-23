@@ -9,26 +9,21 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SettingsInputAntenna
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -57,12 +52,12 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.time.Duration
 
 private val ToolsNavy = Color(0xFF102A43)
 private val ToolsBlue = Color(0xFF246BFD)
 private val ToolsMuted = Color(0xFF68788B)
 private val ToolsBorder = Color(0xFFE5EBF2)
-private val ConsoleBackground = Color(0xFF101820)
 
 private data class ReceiverSnapshot(val model: String, val service: String, val signal: String)
 private data class RemoteFile(val name: String, val directory: Boolean, val size: Long)
@@ -93,8 +88,13 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
         scope.launch {
             busy = true
             error = null
-            try { action() } catch (e: Exception) { error = e.message ?: "Operation failed" }
-            finally { busy = false }
+            try {
+                action()
+            } catch (e: Exception) {
+                error = e.message ?: "Operation failed"
+            } finally {
+                busy = false
+            }
         }
     }
 
@@ -190,12 +190,18 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                     if (ftpPath != "/") TextButton(onClick = {
                         val parent = ftpPath.trimEnd('/').substringBeforeLast('/', "")
                         val newPath = if (parent.isBlank()) "/" else "$parent/"
-                        launchIo { ftpItems = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, newPath) }; ftpPath = newPath }
+                        launchIo {
+                            ftpItems = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, newPath) }
+                            ftpPath = newPath
+                        }
                     }) { Text(".. Parent folder") }
                     ftpItems.take(100).forEach { item ->
                         TextButton(enabled = item.directory && !busy, onClick = {
                             val child = if (ftpPath.endsWith('/')) ftpPath + item.name else "$ftpPath/${item.name}"
-                            launchIo { ftpItems = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, child) }; ftpPath = child.trimEnd('/') + "/" }
+                            launchIo {
+                                ftpItems = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, child) }
+                                ftpPath = child.trimEnd('/') + "/"
+                            }
                         }, modifier = Modifier.fillMaxWidth()) {
                             Text((if (item.directory) "📁  " else "📄  ") + item.name + if (item.directory) "/" else " · ${item.size} bytes", modifier = Modifier.fillMaxWidth(), color = ToolsNavy)
                         }
@@ -253,7 +259,7 @@ private object Enigma2Client {
 
     private fun field(xml: String, tag: String): String? {
         val pattern = Regex("<$tag(?:\\s[^>]*)?>(.*?)</$tag>", RegexOption.IGNORE_CASE or RegexOption.DOT_MATCHES_ALL)
-        return pattern.find(xml)?.groupValues?.get(1)?.replace(Regex("<[^>]+>"), "")?.trim()?.takeIf { it.isNotBlank() }
+        return pattern.find(xml)?.groups?.get(1)?.value?.replace(Regex("<[^>]+>"), "")?.trim()?.takeIf { it.isNotBlank() }
     }
 
     private fun request(host: String, port: Int, username: String, password: String, path: String): String =
@@ -275,9 +281,8 @@ private object Enigma2Client {
         try {
             val code = connection.responseCode
             if (code !in 200..299) throw IOException("Receiver returned HTTP $code")
-            val stream = connection.inputStream
             val output = ByteArrayOutputStream()
-            stream.use { input ->
+            connection.inputStream.use { input ->
                 val buffer = ByteArray(8192)
                 var total = 0
                 while (true) {
@@ -289,7 +294,9 @@ private object Enigma2Client {
                 }
             }
             return output.toByteArray()
-        } finally { connection.disconnect() }
+        } finally {
+            connection.disconnect()
+        }
     }
 }
 
@@ -300,7 +307,7 @@ private object FtpBrowser {
         val client = FTPClient().apply {
             connectTimeout = 5000
             defaultTimeout = 5000
-            dataTimeout = 7000
+            dataTimeout = Duration.ofSeconds(7)
         }
         try {
             client.connect(host.trim(), port)
