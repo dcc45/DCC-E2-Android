@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -51,6 +52,8 @@ import org.apache.commons.net.ftp.FTPClient
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.net.URL
 import java.time.Duration
 
@@ -58,11 +61,13 @@ private val ToolsNavy = Color(0xFF102A43)
 private val ToolsBlue = Color(0xFF246BFD)
 private val ToolsMuted = Color(0xFF68788B)
 private val ToolsBorder = Color(0xFFE5EBF2)
+private val ToolsRed = Color(0xFF9C2F26)
+
 private data class ReceiverSnapshot(val model: String, val service: String, val signal: String)
 private data class RemoteFile(val name: String, val directory: Boolean, val size: Long)
 private enum class ConfirmAction(val title: String, val description: String, val state: Int) {
     RESTART_GUI("Restart Enigma2", "Restart the receiver user interface. TV viewing will be interrupted briefly.", 3),
-    REBOOT("Reboot receiver", "Restart the DM900 completely. This may take several minutes.", 2)
+    REBOOT("Reboot receiver", "Restart the receiver completely. This may take several minutes.", 2)
 }
 
 @Composable
@@ -70,6 +75,7 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
     var host by remember(receiverIp) { mutableStateOf(receiverIp) }
     var webPort by remember { mutableStateOf("80") }
     var ftpPort by remember { mutableStateOf("21") }
+    var telnetPort by remember { mutableStateOf("23") }
     var snapshot by remember { mutableStateOf<ReceiverSnapshot?>(null) }
     var status by remember { mutableStateOf("Not connected") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -80,6 +86,7 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
     var ftpPath by remember { mutableStateOf("/") }
     var ftpConnected by remember { mutableStateOf(false) }
     var ftpStatus by remember { mutableStateOf("FTP not connected") }
+    var telnetStatus by remember { mutableStateOf("Telnet not checked") }
     val scope = rememberCoroutineScope()
 
     fun launchIo(action: suspend () -> Unit) {
@@ -95,15 +102,15 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("DM900 receiver tools", style = MaterialTheme.typography.headlineSmall, color = ToolsNavy, fontWeight = FontWeight.Bold)
-            Text("OpenATV / Enigma2 Web Interface and read-only FTP browser", color = ToolsMuted)
+            Text("Diagnostics, read-only FTP browsing, screenshots, and receiver maintenance.", color = ToolsMuted)
         }
         Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, ToolsBorder)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Receiver connection", color = ToolsNavy, fontWeight = FontWeight.Bold)
-                OutlinedTextField(host, { host = it.trim() }, Modifier.fillMaxWidth(), label = { Text("Receiver IP or hostname") }, singleLine = true)
+                OutlinedTextField(value = host, onValueChange = { host = it.trim() }, modifier = Modifier.fillMaxWidth(), label = { Text("Receiver IP or hostname") }, singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(webPort, { webPort = it.filter(Char::isDigit).take(5) }, Modifier.weight(1f), label = { Text("Web port") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                    OutlinedTextField(ftpPort, { ftpPort = it.filter(Char::isDigit).take(5) }, Modifier.weight(1f), label = { Text("FTP port") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    OutlinedTextField(value = webPort, onValueChange = { webPort = it.filter(Char::isDigit).take(5) }, modifier = Modifier.weight(1f), label = { Text("Web port") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    OutlinedTextField(value = ftpPort, onValueChange = { ftpPort = it.filter(Char::isDigit).take(5) }, modifier = Modifier.weight(1f), label = { Text("FTP port") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(enabled = !busy && host.isNotBlank(), onClick = {
@@ -118,7 +125,6 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                     HorizontalDivider(color = ToolsBorder)
                     Text("Model: ${info.model}", color = ToolsNavy)
                     Text("Current service: ${info.service}", color = ToolsNavy)
-                    Text("Tuner signal: ${info.signal}", color = ToolsNavy)
                 }
             }
         }
@@ -126,13 +132,16 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     androidx.compose.material3.Icon(Icons.Default.SettingsInputAntenna, null, tint = ToolsBlue)
-                    Text("Signal and receiver status", color = ToolsNavy, fontWeight = FontWeight.Bold)
+                    Text("Signal meter", color = ToolsNavy, fontWeight = FontWeight.Bold)
                 }
-                Text("Reads current Enigma2 service and tuner metrics from the receiver Web Interface.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+                Text("Reads service and tuner metrics from the receiver Web Interface.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(enabled = !busy && host.isNotBlank(), onClick = {
                     launchIo { snapshot = withContext(Dispatchers.IO) { Enigma2Client.snapshot(host, webPort.toIntOrNull() ?: 80, username, password) } }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Refresh signal metrics") }
-                snapshot?.let { Text(it.signal, color = ToolsNavy, fontWeight = FontWeight.SemiBold) }
+                snapshot?.let { info ->
+                    Text(info.signal, color = ToolsNavy, fontWeight = FontWeight.SemiBold)
+                    SignalMeter(info.signal)
+                } ?: Text("Connect to the receiver to display available tuner metrics.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
             }
         }
         Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, ToolsBorder)) {
@@ -141,37 +150,57 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                     androidx.compose.material3.Icon(Icons.Default.Terminal, null, tint = ToolsBlue)
                     Text("Receiver screenshot", color = ToolsNavy, fontWeight = FontWeight.Bold)
                 }
-                Text("Capture the receiver's current on-screen image via the Web Interface.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+                Text("Capture the receiver's current on-screen image via its Web Interface.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(enabled = !busy && host.isNotBlank(), onClick = {
                     launchIo { screenshot = withContext(Dispatchers.IO) { Enigma2Client.screenshot(host, webPort.toIntOrNull() ?: 80, username, password) } }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Capture screenshot") }
-                screenshot?.let { Image(it.asImageBitmap(), contentDescription = "DM900 screenshot", modifier = Modifier.fillMaxWidth().height(220.dp)) }
+                screenshot?.let { Image(it.asImageBitmap(), contentDescription = "Receiver screenshot", modifier = Modifier.fillMaxWidth().height(220.dp)) }
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, ToolsBorder)) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Telnet diagnostics", color = ToolsNavy, fontWeight = FontWeight.Bold)
+                Text("Checks whether the Telnet port is reachable only. This diagnostic does not log in or send commands.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value = telnetPort, onValueChange = { telnetPort = it.filter(Char::isDigit).take(5) }, modifier = Modifier.fillMaxWidth(), label = { Text("Telnet port") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(enabled = !busy && host.isNotBlank(), onClick = {
+                        launchIo {
+                            val port = telnetPort.toIntOrNull() ?: 23
+                            telnetStatus = withContext(Dispatchers.IO) { TelnetDiagnostics.check(host, port) }
+                        }
+                    }) { Text("Test Telnet port") }
+                    Text(telnetStatus, color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
         Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, ToolsBorder)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     androidx.compose.material3.Icon(Icons.Default.Build, null, tint = ToolsBlue)
-                    Text("Maintenance", color = ToolsNavy, fontWeight = FontWeight.Bold)
+                    Text("Maintenance and rescue / recovery", color = ToolsNavy, fontWeight = FontWeight.Bold)
                 }
-                Text("Use only on a receiver you own or administer. Firmware flashing is intentionally not automated; use the official recovery procedure and verified firmware.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+                Text("Restart or reboot is available for receivers you own or administer and requires confirmation. Rescue/recovery mode must be entered using the receiver's physical controls and official procedure.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(enabled = !busy && host.isNotBlank(), onClick = { pendingAction = ConfirmAction.RESTART_GUI }, modifier = Modifier.weight(1f)) { Text("Restart Enigma2") }
                     Button(enabled = !busy && host.isNotBlank(), onClick = { pendingAction = ConfirmAction.REBOOT }, modifier = Modifier.weight(1f)) { Text("Reboot") }
                 }
+                HorizontalDivider(color = ToolsBorder)
+                Text("Recovery checklist", color = ToolsNavy, fontWeight = FontWeight.SemiBold)
+                Text("1. Follow the DM900 manufacturer's recovery instructions to enter rescue mode.  2. Connect this phone to the same trusted network.  3. Enter the receiver's displayed recovery address above to check connectivity.  4. Install firmware only from an official, verified source using the receiver's recovery page.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+                Text("This app does not trigger bootloader recovery, upload firmware, or flash the receiver.", color = ToolsRed, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
             }
         }
         Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, ToolsBorder)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("FTP file browser (read only)", color = ToolsNavy, fontWeight = FontWeight.Bold)
-                Text("Lists remote files and folders only; it cannot upload, delete, or change receiver files.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+                Text("Lists remote files and folders only; this browser cannot upload, delete, or change receiver files.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(enabled = !busy && host.isNotBlank() && !ftpConnected, onClick = {
                         launchIo {
                             ftpItems = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, "/") }
                             ftpPath = "/"
                             ftpConnected = true
-                            ftpStatus = "Connected · ${ftpItems.size} entries"
+                            ftpStatus = "Listed ${ftpItems.size} entries"
                         }
                     }, modifier = Modifier.weight(1f)) { Text("Connect and list /") }
                     OutlinedButton(enabled = ftpConnected && !busy, onClick = { ftpConnected = false; ftpItems = emptyList(); ftpPath = "/"; ftpStatus = "FTP disconnected" }, modifier = Modifier.weight(1f)) { Text("Disconnect") }
@@ -196,8 +225,8 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                 }
             }
         }
-        error?.let { Text("Error: $it", color = Color(0xFF9C2F26), modifier = Modifier.fillMaxWidth().background(Color(0xFFFFF1F0), RoundedCornerShape(12.dp)).padding(12.dp)) }
-        Text("HTTP Web Interface and FTP are typically unencrypted. Use a trusted local network and do not expose these services to the public internet.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+        error?.let { Text("Error: $it", color = ToolsRed, modifier = Modifier.fillMaxWidth().background(Color(0xFFFFF1F0), RoundedCornerShape(12.dp)).padding(12.dp)) }
+        Text("HTTP, FTP, and Telnet are unencrypted. Use only on a trusted local network; do not expose receiver services to the public internet.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
     }
 
     pendingAction?.let { action ->
@@ -216,6 +245,31 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
             },
             dismissButton = { TextButton(onClick = { pendingAction = null }) { Text("Cancel") } }
         )
+    }
+}
+
+@Composable
+private fun SignalMeter(signal: String) {
+    val numericSnr = Regex("SNR:\\s*(\\d+(?:\\.\\d+)?)", RegexOption.IGNORE_CASE)
+        .find(signal)?.groupValues?.getOrNull(1)?.toFloatOrNull()
+    if (numericSnr != null && !signal.contains("dB", ignoreCase = true)) {
+        val percent = (numericSnr / 100f).coerceIn(0f, 1f)
+        LinearProgressIndicator(progress = percent, modifier = Modifier.fillMaxWidth())
+        Text("Approximate SNR level: ${percent.times(100).toInt()}%", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+    } else {
+        Text("A percentage meter is shown when the receiver provides SNR as a percentage.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+private object TelnetDiagnostics {
+    fun check(host: String, port: Int): String {
+        require(host.isNotBlank() && port in 1..65535) { "Enter a valid receiver and port" }
+        return try {
+            Socket().use { socket -> socket.connect(InetSocketAddress(host.trim(), port), 3000) }
+            "Port $port is reachable; no login or commands sent."
+        } catch (_: Exception) {
+            "Port $port is not reachable. Check the address, network, and receiver settings."
+        }
     }
 }
 
@@ -298,8 +352,7 @@ private object FtpBrowser {
             if (!client.login(username.ifBlank { "anonymous" }, password)) throw IOException("FTP login failed: ${client.replyString}")
             client.enterLocalPassiveMode()
             client.setFileType(FTP.BINARY_FILE_TYPE)
-            val files = client.listFiles(path)
-            return files.filter { it.name != "." && it.name != ".." }
+            return client.listFiles(path).filter { it.name != "." && it.name != ".." }
                 .map { RemoteFile(it.name, it.isDirectory, it.size) }
                 .sortedWith(compareByDescending<RemoteFile> { it.directory }.thenBy { it.name.lowercase() })
         } finally {
