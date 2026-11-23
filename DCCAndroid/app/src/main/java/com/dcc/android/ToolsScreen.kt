@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -56,6 +57,7 @@ import java.time.Duration
 
 private val ToolsNavy = Color(0xFF102A43)
 private val ToolsBlue = Color(0xFF246BFD)
+private val ToolsPurple = Color(0xFF9C27B0)
 private val ToolsMuted = Color(0xFF68788B)
 private val ToolsBorder = Color(0xFFE5EBF2)
 private val ToolsRed = Color(0xFF9C2F26)
@@ -142,7 +144,19 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                 OutlinedButton(enabled = !busy && host.isNotBlank(), onClick = {
                     launchIo { snapshot = withContext(Dispatchers.IO) { Enigma2Client.snapshot(host, webPort.toIntOrNull() ?: 80, username, password) } }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Refresh signal metrics") }
-                snapshot?.let { Text(it.signal, color = ToolsNavy, fontWeight = FontWeight.SemiBold) }
+                snapshot?.let { info ->
+                    Text(info.signal, color = ToolsNavy, fontWeight = FontWeight.SemiBold)
+                    val signalPercent = remember(info.signal) { Enigma2Client.signalPercent(info.signal) }
+                    if (signalPercent != null) {
+                        LinearProgressIndicator(
+                            progress = { signalPercent / 100f },
+                            modifier = Modifier.fillMaxWidth().height(10.dp),
+                            color = ToolsPurple,
+                            trackColor = ToolsPurple.copy(alpha = 0.18f)
+                        )
+                        Text("Signal strength: $signalPercent%", color = ToolsPurple, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
         }
 
@@ -154,7 +168,8 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                 }
                 Text("Capture the receiver on-screen image via the Web Interface.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(enabled = !busy && host.isNotBlank(), onClick = {
-                    launchIo { screenshot = withContext(Dispatchers.IO) { Enigma2Client.screenshot(host, webPort.toIntOrNull() ?: 80, username, password) } }
+                    launchIo { screenshot = withContext(Dispatchers.IO) { Enigma2Client.screenshot(host, webPort.toIntOrNull() ?: 80, username, password) }
+                    }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Capture screenshot") }
                 screenshot?.let { Image(it.asImageBitmap(), contentDescription = "Receiver screenshot", modifier = Modifier.fillMaxWidth().height(220.dp)) }
             }
@@ -184,7 +199,7 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                     Button(enabled = !busy && host.isNotBlank(), onClick = { pendingAction = ConfirmAction.REBOOT }, modifier = Modifier.weight(1f)) { Text("Reboot") }
                 }
                 HorizontalDivider(color = ToolsBorder)
-                Text("For rescue/recovery, use the DM900's physical recovery controls and official verified firmware procedure. This app does not flash firmware or enter bootloader mode.", color = ToolsRed, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                Text("For rescue/recovery, use the DM900's physical recovery controls and official verified firmware procedure. This app does not flash firmware or enter bootloader mode.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
             }
         }
 
@@ -273,6 +288,14 @@ private object Enigma2Client {
         val metrics = names.mapNotNull { (tag, label) -> field(signal, tag)?.let { "$label: $it" } }.distinct()
         val signalText = metrics.takeIf { it.isNotEmpty() }?.joinToString(" · ") ?: "No tuner metrics returned"
         return ReceiverSnapshot(model, service, signalText)
+    }
+
+    fun signalPercent(signal: String): Int? {
+        val snr = Regex("\\bSNR\\s*:\\s*(\\d+(?:\\.\\d+)?)", RegexOption.IGNORE_CASE)
+            .find(signal)?.groupValues?.get(1)?.toFloatOrNull() ?: return null
+        // Web Interface SNR is commonly reported as a 0–100 percentage; clamp
+        // just in case a receiver reports a value outside that range.
+        return snr.toInt().coerceIn(0, 100)
     }
 
     fun screenshot(host: String, port: Int, username: String, password: String): Bitmap {
