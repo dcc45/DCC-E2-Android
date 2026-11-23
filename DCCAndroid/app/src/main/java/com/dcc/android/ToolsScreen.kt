@@ -58,10 +58,9 @@ private val ToolsNavy = Color(0xFF102A43)
 private val ToolsBlue = Color(0xFF246BFD)
 private val ToolsMuted = Color(0xFF68788B)
 private val ToolsBorder = Color(0xFFE5EBF2)
-
 private data class ReceiverSnapshot(val model: String, val service: String, val signal: String)
 private data class RemoteFile(val name: String, val directory: Boolean, val size: Long)
-private enum class ConfirmAction(val title: String, val description: String, val apiState: Int) {
+private enum class ConfirmAction(val title: String, val description: String, val state: Int) {
     RESTART_GUI("Restart Enigma2", "Restart the receiver user interface. TV viewing will be interrupted briefly.", 3),
     REBOOT("Reboot receiver", "Restart the DM900 completely. This may take several minutes.", 2)
 }
@@ -88,13 +87,8 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
         scope.launch {
             busy = true
             error = null
-            try {
-                action()
-            } catch (e: Exception) {
-                error = e.message ?: "Operation failed"
-            } finally {
-                busy = false
-            }
+            try { action() } catch (e: Exception) { error = e.message ?: "Operation failed" }
+            finally { busy = false }
         }
     }
 
@@ -114,8 +108,7 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Button(enabled = !busy && host.isNotBlank(), onClick = {
                         launchIo {
-                            val result = withContext(Dispatchers.IO) { Enigma2Client.snapshot(host, webPort.toIntOrNull() ?: 80, username, password) }
-                            snapshot = result
+                            snapshot = withContext(Dispatchers.IO) { Enigma2Client.snapshot(host, webPort.toIntOrNull() ?: 80, username, password) }
                             status = "Connected to ${host.trim()}"
                         }
                     }) { Text(if (busy) "Working…" else "Check receiver") }
@@ -135,7 +128,7 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                     androidx.compose.material3.Icon(Icons.Default.SettingsInputAntenna, null, tint = ToolsBlue)
                     Text("Signal and receiver status", color = ToolsNavy, fontWeight = FontWeight.Bold)
                 }
-                Text("Reads the current Enigma2 service and tuner metrics from the receiver Web Interface.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+                Text("Reads current Enigma2 service and tuner metrics from the receiver Web Interface.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(enabled = !busy && host.isNotBlank(), onClick = {
                     launchIo { snapshot = withContext(Dispatchers.IO) { Enigma2Client.snapshot(host, webPort.toIntOrNull() ?: 80, username, password) } }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Refresh signal metrics") }
@@ -161,7 +154,7 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                     androidx.compose.material3.Icon(Icons.Default.Build, null, tint = ToolsBlue)
                     Text("Maintenance", color = ToolsNavy, fontWeight = FontWeight.Bold)
                 }
-                Text("Use only on a receiver you own or administer. Recovery/firmware flashing is intentionally not automated; use the DM900's official recovery procedure and verified firmware image.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+                Text("Use only on a receiver you own or administer. Firmware flashing is intentionally not automated; use the official recovery procedure and verified firmware.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(enabled = !busy && host.isNotBlank(), onClick = { pendingAction = ConfirmAction.RESTART_GUI }, modifier = Modifier.weight(1f)) { Text("Restart Enigma2") }
                     Button(enabled = !busy && host.isNotBlank(), onClick = { pendingAction = ConfirmAction.REBOOT }, modifier = Modifier.weight(1f)) { Text("Reboot") }
@@ -171,15 +164,14 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
         Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, ToolsBorder)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("FTP file browser (read only)", color = ToolsNavy, fontWeight = FontWeight.Bold)
-                Text("Lists remote files and folders only; this browser does not upload, delete, or change receiver files.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+                Text("Lists remote files and folders only; it cannot upload, delete, or change receiver files.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(enabled = !busy && host.isNotBlank() && !ftpConnected, onClick = {
                         launchIo {
-                            val listing = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, "/") }
-                            ftpItems = listing
+                            ftpItems = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, "/") }
                             ftpPath = "/"
                             ftpConnected = true
-                            ftpStatus = "Connected · ${listing.size} entries"
+                            ftpStatus = "Connected · ${ftpItems.size} entries"
                         }
                     }, modifier = Modifier.weight(1f)) { Text("Connect and list /") }
                     OutlinedButton(enabled = ftpConnected && !busy, onClick = { ftpConnected = false; ftpItems = emptyList(); ftpPath = "/"; ftpStatus = "FTP disconnected" }, modifier = Modifier.weight(1f)) { Text("Disconnect") }
@@ -190,18 +182,12 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                     if (ftpPath != "/") TextButton(onClick = {
                         val parent = ftpPath.trimEnd('/').substringBeforeLast('/', "")
                         val newPath = if (parent.isBlank()) "/" else "$parent/"
-                        launchIo {
-                            ftpItems = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, newPath) }
-                            ftpPath = newPath
-                        }
+                        launchIo { ftpItems = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, newPath) }; ftpPath = newPath }
                     }) { Text(".. Parent folder") }
                     ftpItems.take(100).forEach { item ->
                         TextButton(enabled = item.directory && !busy, onClick = {
                             val child = if (ftpPath.endsWith('/')) ftpPath + item.name else "$ftpPath/${item.name}"
-                            launchIo {
-                                ftpItems = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, child) }
-                                ftpPath = child.trimEnd('/') + "/"
-                            }
+                            launchIo { ftpItems = withContext(Dispatchers.IO) { FtpBrowser.list(host, ftpPort.toIntOrNull() ?: 21, username, password, child) }; ftpPath = child.trimEnd('/') + "/" }
                         }, modifier = Modifier.fillMaxWidth()) {
                             Text((if (item.directory) "📁  " else "📄  ") + item.name + if (item.directory) "/" else " · ${item.size} bytes", modifier = Modifier.fillMaxWidth(), color = ToolsNavy)
                         }
@@ -211,7 +197,7 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
             }
         }
         error?.let { Text("Error: $it", color = Color(0xFF9C2F26), modifier = Modifier.fillMaxWidth().background(Color(0xFFFFF1F0), RoundedCornerShape(12.dp)).padding(12.dp)) }
-        Text("HTTP Web Interface and FTP are typically unencrypted. Use a trusted local network, unique receiver credentials, and do not expose these services to the public internet.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
+        Text("HTTP Web Interface and FTP are typically unencrypted. Use a trusted local network and do not expose these services to the public internet.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
     }
 
     pendingAction?.let { action ->
@@ -223,7 +209,7 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                 TextButton(onClick = {
                     pendingAction = null
                     launchIo {
-                        withContext(Dispatchers.IO) { Enigma2Client.maintenance(host, webPort.toIntOrNull() ?: 80, username, password, action.apiState) }
+                        withContext(Dispatchers.IO) { Enigma2Client.maintenance(host, webPort.toIntOrNull() ?: 80, username, password, action.state) }
                         status = "${action.title} request sent"
                     }
                 }) { Text("Confirm") }
@@ -242,9 +228,10 @@ private object Enigma2Client {
         val signal = runCatching { request(host, port, username, password, "/web/signal") }.getOrDefault("")
         val model = field(about, "e2model") ?: field(about, "e2machine") ?: field(about, "e2image") ?: "Enigma2 receiver"
         val service = field(current, "e2servicename") ?: field(current, "e2name") ?: "No service information returned"
-        val metricNames = listOf("e2snrdb" to "SNR", "e2snr" to "SNR", "e2agc" to "AGC", "e2ber" to "BER", "e2lock" to "Lock")
-        val metrics = metricNames.mapNotNull { (tag, label) -> field(signal, tag)?.let { "$label: $it" } }.distinct()
-        return ReceiverSnapshot(model, service, metrics.takeIf { it.isNotEmpty() }?.joinToString(" · ") ?: "No tuner metrics returned (tune to a channel and verify Web Interface access)")
+        val names = listOf("e2snrdb" to "SNR", "e2snr" to "SNR", "e2agc" to "AGC", "e2ber" to "BER", "e2lock" to "Lock")
+        val metrics = names.mapNotNull { (tag, label) -> field(signal, tag)?.let { "$label: $it" } }.distinct()
+        val signalText = metrics.takeIf { it.isNotEmpty() }?.joinToString(" · ") ?: "No tuner metrics returned"
+        return ReceiverSnapshot(model, service, signalText)
     }
 
     fun screenshot(host: String, port: Int, username: String, password: String): Bitmap {
@@ -258,8 +245,8 @@ private object Enigma2Client {
     }
 
     private fun field(xml: String, tag: String): String? {
-        val pattern = Regex("<$tag(?:\\s[^>]*)?>(.*?)</$tag>", RegexOption.IGNORE_CASE or RegexOption.DOT_MATCHES_ALL)
-        return pattern.find(xml)?.groups?.get(1)?.value?.replace(Regex("<[^>]+>"), "")?.trim()?.takeIf { it.isNotBlank() }
+        val pattern = Regex("<$tag(?:\\s[^>]*)?>(.*?)</$tag>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+        return pattern.find(xml)?.groupValues?.get(1)?.replace(Regex("<[^>]+>"), "")?.trim()?.takeIf { it.isNotBlank() }
     }
 
     private fun request(host: String, port: Int, username: String, password: String, path: String): String =
@@ -267,8 +254,7 @@ private object Enigma2Client {
 
     private fun requestBytes(host: String, port: Int, username: String, password: String, path: String): ByteArray {
         require(host.isNotBlank() && port in 1..65535)
-        val url = URL("http://${host.trim()}:$port$path")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
+        val connection = (URL("http://${host.trim()}:$port$path").openConnection() as HttpURLConnection).apply {
             connectTimeout = 5000
             readTimeout = 8000
             requestMethod = "GET"
@@ -294,9 +280,7 @@ private object Enigma2Client {
                 }
             }
             return output.toByteArray()
-        } finally {
-            connection.disconnect()
-        }
+        } finally { connection.disconnect() }
     }
 }
 
@@ -315,8 +299,8 @@ private object FtpBrowser {
             client.enterLocalPassiveMode()
             client.setFileType(FTP.BINARY_FILE_TYPE)
             val files = client.listFiles(path)
-            if (!client.completePendingCommand() && !client.isConnected) throw IOException("FTP listing did not complete")
-            return files.filter { it.name != "." && it.name != ".." }.map { RemoteFile(it.name, it.isDirectory, it.size) }
+            return files.filter { it.name != "." && it.name != ".." }
+                .map { RemoteFile(it.name, it.isDirectory, it.size) }
                 .sortedWith(compareByDescending<RemoteFile> { it.directory }.thenBy { it.name.lowercase() })
         } finally {
             runCatching { if (client.isConnected) { client.logout(); client.disconnect() } }
