@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -25,6 +26,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +57,20 @@ fun ListenScreen(
     onStop: () -> Unit,
     onErrorDismiss: () -> Unit
 ) {
+    var protocol by remember { mutableStateOf(if (urlInput.startsWith("https://", true)) "HTTPS" else "HTTP") }
+
+    fun rawUrl(value: String): String = value
+        .removePrefix("http://")
+        .removePrefix("HTTP://")
+        .removePrefix("https://")
+        .removePrefix("HTTPS://")
+
+    fun setProtocol(nextProtocol: String) {
+        protocol = nextProtocol
+        val raw = rawUrl(urlInput)
+        onUrlChange(if (raw.isBlank()) "" else "${nextProtocol.lowercase()}://$raw")
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("Listen mode", style = MaterialTheme.typography.headlineSmall, color = ListenNavy, fontWeight = FontWeight.Bold)
@@ -105,19 +124,39 @@ fun ListenScreen(
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Audio stream URL", color = ListenNavy, fontWeight = FontWeight.Bold)
+
+                Text("Protocol", color = ListenMuted, style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    FilterChip(
+                        selected = protocol == "HTTP",
+                        onClick = { setProtocol("HTTP") },
+                        label = { Text("HTTP") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = protocol == "HTTPS",
+                        onClick = { setProtocol("HTTPS") },
+                        label = { Text("HTTPS") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
                 OutlinedTextField(
-                    value = urlInput,
-                    onValueChange = onUrlChange,
+                    value = rawUrl(urlInput),
+                    onValueChange = { raw ->
+                        val clean = rawUrl(raw.trim())
+                        onUrlChange(if (clean.isBlank()) "" else "${protocol.lowercase()}://$clean")
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    placeholder = { Text("http://receiver:8001/audio...") },
+                    placeholder = { Text(if (protocol == "HTTPS") "https://192.168.1.104:8001/audio" else "http://192.168.1.104:8001/audio") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     shape = RoundedCornerShape(14.dp)
                 )
                 Button(onClick = onPlay, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
                     Text(if (listenUrl.isBlank()) "Start listening" else "Listen to this stream")
                 }
-                Text("Use an HTTP or HTTPS audio stream URL from your Dreambox.", color = ListenMuted, style = MaterialTheme.typography.bodySmall)
+                Text("Choose HTTP or HTTPS, then enter the receiver IP and audio stream path.", color = ListenMuted, style = MaterialTheme.typography.bodySmall)
             }
         }
 
