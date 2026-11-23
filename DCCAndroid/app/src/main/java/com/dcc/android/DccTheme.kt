@@ -1,8 +1,10 @@
 package com.dcc.android
 
+import android.app.Activity
 import android.content.res.Configuration
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.view.View
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -13,6 +15,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -23,6 +26,7 @@ import androidx.compose.ui.unit.dp
 
 private val DccBlue = Color(0xFF246BFD)
 private val DccNavy = Color(0xFF102A43)
+private val DccStatusPurple = 0xFF7C4DFF
 
 @Composable
 fun DccTheme(content: @Composable () -> Unit) {
@@ -32,6 +36,15 @@ fun DccTheme(content: @Composable () -> Unit) {
     val accent = preferences.getString("theme_accent", "blue") ?: "blue"
     val backgroundName = preferences.getString("theme_background", "light") ?: "light"
     val wallpaperUri = preferences.getString("theme_wallpaper", "") ?: ""
+
+    SideEffect {
+        (context as? Activity)?.window?.apply {
+            statusBarColor = DccStatusPurple.toInt()
+            val flags = decorView.systemUiVisibility and
+                View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
+            decorView.systemUiVisibility = flags
+        }
+    }
 
     val systemDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
     val useDark = when (mode) {
