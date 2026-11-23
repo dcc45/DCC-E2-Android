@@ -223,6 +223,8 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
             }
         }
 
+        RemoteBouquetSoftCamCard(host, username, password)
+
         error?.let { Text("Error: $it", color = ToolsRed, modifier = Modifier.fillMaxWidth().background(Color(0xFFFFF1F0), RoundedCornerShape(12.dp)).padding(12.dp)) }
         Text("HTTP, FTP, and Telnet are unencrypted. Use only on a trusted local network.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
     }
