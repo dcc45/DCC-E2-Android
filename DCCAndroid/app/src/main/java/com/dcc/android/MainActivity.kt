@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -35,7 +36,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import kotlinx.coroutines.delay
 
 private val Navy = Color(0xFF102A43)
 private val Blue = Color(0xFF246BFD)
@@ -59,6 +59,11 @@ private fun DccApp() {
     var error by remember { mutableStateOf<String?>(null) }
     var fullscreen by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val preferences = remember { context.getSharedPreferences("dcc_receiver", android.content.Context.MODE_PRIVATE) }
+    var receiverIp by remember { mutableStateOf(preferences.getString("ip", "") ?: "") }
+    var receiverUser by remember { mutableStateOf(preferences.getString("user", "root") ?: "root") }
+    var receiverPassword by remember { mutableStateOf(preferences.getString("password", "") ?: "") }
+    var savedMessage by remember { mutableStateOf<String?>(null) }
     val player = remember { ExoPlayer.Builder(context).build() }
     var isPlaying by remember { mutableStateOf(false) }
 
@@ -127,8 +132,12 @@ private fun DccApp() {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         when (selected) {
-                            0 -> SimpleScreen("Your network", "Connect to your Dreambox to browse and control your receiver.", "Dreambox · 192.168.1.4 · Not connected")
-                            1 -> SimpleScreen("Devices", "Saved devices on your network", "Dreambox  ·  192.168.1.4")
+                            0 -> SimpleScreen(
+                                "Your network",
+                                "Enter your receiver address and login in Settings to configure DCC.",
+                                if (receiverIp.isBlank()) "Dreambox · Not configured" else "Dreambox · $receiverIp · Saved"
+                            )
+                            1 -> SimpleScreen("Devices", "Saved receiver on your network", if (receiverIp.isBlank()) "No receiver configured yet. Add its IP in Settings." else "Dreambox  ·  $receiverIp")
                             2 -> StreamScreen(
                                 player = player, streamUrl = streamUrl, urlInput = urlInput,
                                 onUrlChange = { urlInput = it }, playing = isPlaying,
@@ -150,11 +159,75 @@ private fun DccApp() {
                                 onFullscreen = { fullscreen = true },
                                 onMinimize = { selected = 0 }
                             )
-                            3 -> SimpleScreen("Tools", "Receiver utilities", "FTP browser · Telnet console · Connection details")
-                            else -> SimpleScreen("Settings", "Personalize your DCC experience", "Notifications · Auto reconnect")
+                            3 -> SimpleScreen("Tools", "Receiver utilities", "FTP browser and Telnet console are not implemented in this build yet.")
+                            else -> ReceiverSettingsScreen(
+                                ip = receiverIp,
+                                onIpChange = { receiverIp = it; savedMessage = null },
+                                username = receiverUser,
+                                onUsernameChange = { receiverUser = it; savedMessage = null },
+                                password = receiverPassword,
+                                onPasswordChange = { receiverPassword = it; savedMessage = null },
+                                savedMessage = savedMessage,
+                                onSave = {
+                                    preferences.edit()
+                                        .putString("ip", receiverIp.trim())
+                                        .putString("user", receiverUser.trim())
+                                        .putString("password", receiverPassword)
+                                        .apply()
+                                    receiverIp = receiverIp.trim()
+                                    receiverUser = receiverUser.trim()
+                                    savedMessage = "Receiver details saved on this device."
+                                }
+                            )
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReceiverSettingsScreen(
+    ip: String,
+    onIpChange: (String) -> Unit,
+    username: String,
+    onUsernameChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    savedMessage: String?,
+    onSave: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Receiver settings", style = MaterialTheme.typography.headlineSmall, color = Navy, fontWeight = FontWeight.Bold)
+            Text("Enter the Dreambox IP address and login details.", color = Muted)
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
+            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = ip, onValueChange = onIpChange, modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Receiver IP address or hostname") }, placeholder = { Text("192.168.1.4") },
+                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    value = username, onValueChange = onUsernameChange, modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Username") }, placeholder = { Text("root") }, singleLine = true,
+                    shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    value = password, onValueChange = onPasswordChange, modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Password") }, singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                Button(onClick = onSave, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
+                    Text("Save receiver settings")
+                }
+                savedMessage?.let { Text(it, color = Blue, style = MaterialTheme.typography.bodyMedium) }
+                Text("These details are saved on this phone. Receiver control features are not yet connected in this build.", color = Muted, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -192,7 +265,7 @@ private fun StreamScreen(
                 OutlinedButton(onClick = onFullscreen) { Text("Expand") }
             }
             Text(if (playing) "LIVE  ·  Streaming from your receiver" else "Stream ready", color = if (playing) Blue else Muted, style = MaterialTheme.typography.bodySmall)
-            Text("$streamUrl", color = Muted, style = MaterialTheme.typography.bodySmall)
+            Text(streamUrl, color = Muted, style = MaterialTheme.typography.bodySmall)
         } else {
             Box(
                 Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp)).background(Color(0xFF101820)),
