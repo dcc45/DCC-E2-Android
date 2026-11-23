@@ -16,10 +16,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,6 +58,9 @@ private fun DccApp() {
     var selected by remember { mutableIntStateOf(0) }
     var streamUrl by remember { mutableStateOf("") }
     var urlInput by remember { mutableStateOf("") }
+    var listenUrl by remember { mutableStateOf("") }
+    var listenUrlInput by remember { mutableStateOf("") }
+    var listenError by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var fullscreen by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -71,7 +76,11 @@ private fun DccApp() {
         val listener = object : androidx.media3.common.Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
             override fun onPlayerError(playbackError: androidx.media3.common.PlaybackException) {
-                error = "Unable to play this stream. Check the URL and receiver connection."
+                if (selected == 6) {
+                    listenError = "Unable to play this audio stream. Check the URL and receiver connection."
+                } else {
+                    error = "Unable to play this stream. Check the URL and receiver connection."
+                }
             }
         }
         player.addListener(listener)
@@ -103,8 +112,14 @@ private fun DccApp() {
             Scaffold(
                 containerColor = Canvas,
                 topBar = {
+                    val title = when (selected) {
+                        2 -> "Live Stream"
+                        5 -> "PVR / Recordings"
+                        6 -> "Listen Mode"
+                        else -> "DCC · Dreambox Control Center"
+                    }
                     TopAppBar(
-                        title = { Text(if (selected == 2) "Live Stream" else "DCC · Dreambox Control Center", color = Navy, fontWeight = FontWeight.Bold) },
+                        title = { Text(title, color = Navy, fontWeight = FontWeight.Bold) },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
                     )
                 },
@@ -115,6 +130,8 @@ private fun DccApp() {
                         NavigationBarItem(selected == 2, { selected = 2 }, icon = { Icon(Icons.Default.LiveTv, null) }, label = { Text("Stream") })
                         NavigationBarItem(selected == 3, { selected = 3 }, icon = { Icon(Icons.Default.Terminal, null) }, label = { Text("Tools") })
                         NavigationBarItem(selected == 4, { selected = 4 }, icon = { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
+                        NavigationBarItem(selected == 5, { selected = 5 }, icon = { Icon(Icons.Default.VideoLibrary, null) }, label = { Text("PVR") })
+                        NavigationBarItem(selected == 6, { selected = 6 }, icon = { Icon(Icons.Default.Headphones, null) }, label = { Text("Listen") })
                     }
                 }
             ) { padding ->
@@ -139,7 +156,7 @@ private fun DccApp() {
                                 onOpenStream = { selected = 2 },
                                 onOpenTools = { selected = 3 }
                             )
-                            1 -> SimpleScreen("Devices", "Saved receiver on your network", if (receiverIp.isBlank()) "No receiver configured yet. Add its IP in Settings." else "Dreambox  ·  $receiverIp")
+                            1 -> DevicesScreen(receiverIp)
                             2 -> StreamScreen(
                                 player = player, streamUrl = streamUrl, urlInput = urlInput,
                                 onUrlChange = { urlInput = it }, playing = isPlaying,
@@ -152,6 +169,7 @@ private fun DccApp() {
                                     } else {
                                         error = null
                                         streamUrl = candidate
+                                        listenUrl = ""
                                         player.setMediaItem(MediaItem.fromUri(uri))
                                         player.prepare()
                                         player.play()
@@ -162,7 +180,7 @@ private fun DccApp() {
                                 onMinimize = { selected = 0 }
                             )
                             3 -> ToolsScreen(AppLanguage.ENGLISH, receiverIp, receiverUser, receiverPassword)
-                            else -> ReceiverSettingsScreen(
+                            4 -> ReceiverSettingsScreen(
                                 ip = receiverIp,
                                 onIpChange = { receiverIp = it; savedMessage = null },
                                 username = receiverUser,
@@ -170,6 +188,8 @@ private fun DccApp() {
                                 password = receiverPassword,
                                 onPasswordChange = { receiverPassword = it; savedMessage = null },
                                 savedMessage = savedMessage,
+                                context = context,
+                                preferences = preferences,
                                 onSave = {
                                     preferences.edit()
                                         .putString("ip", receiverIp.trim())
@@ -180,6 +200,33 @@ private fun DccApp() {
                                     receiverUser = receiverUser.trim()
                                     savedMessage = "Receiver details saved on this device."
                                 }
+                            )
+                            5 -> PvrScreen(receiverIp, receiverUser, receiverPassword)
+                            6 -> ListenScreen(
+                                player = player,
+                                listenUrl = listenUrl,
+                                urlInput = listenUrlInput,
+                                playing = isPlaying,
+                                error = listenError,
+                                onUrlChange = { listenUrlInput = it },
+                                onPlay = {
+                                    val candidate = listenUrlInput.trim()
+                                    val uri = runCatching { Uri.parse(candidate) }.getOrNull()
+                                    if (uri == null || uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
+                                        listenError = "Enter a valid HTTP or HTTPS audio stream URL."
+                                    } else {
+                                        listenError = null
+                                        listenUrl = candidate
+                                        streamUrl = ""
+                                        player.stop()
+                                        player.setMediaItem(MediaItem.fromUri(uri))
+                                        player.prepare()
+                                        player.play()
+                                    }
+                                },
+                                onToggle = { if (isPlaying) player.pause() else if (listenUrl.isNotBlank()) player.play() else listenError = "Enter an audio stream URL to start listening." },
+                                onStop = { player.stop(); listenUrl = ""; isPlaying = false },
+                                onErrorDismiss = { listenError = null }
                             )
                         }
                     }
@@ -198,6 +245,8 @@ private fun ReceiverSettingsScreen(
     password: String,
     onPasswordChange: (String) -> Unit,
     savedMessage: String?,
+    context: android.content.Context,
+    preferences: android.content.SharedPreferences,
     onSave: () -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -229,9 +278,9 @@ private fun ReceiverSettingsScreen(
                     Text("Save receiver settings")
                 }
                 savedMessage?.let { Text(it, color = Blue, style = MaterialTheme.typography.bodyMedium) }
-                Text("These details are saved on this phone. Receiver control features are not yet connected in this build.", color = Muted, style = MaterialTheme.typography.bodySmall)
             }
         }
+        BackupRestoreCard(context, preferences)
     }
 }
 
@@ -294,7 +343,7 @@ private fun StreamScreen(
                 Button(onClick = onPlay, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) {
                     Text(if (streamUrl.isBlank()) "Connect and play" else "Play stream")
                 }
-                Text("Enter the service stream URL provided by your receiver. HLS and common receiver stream formats are supported.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                Text("Enter the service stream URL provided by your receiver.", color = Muted, style = MaterialTheme.typography.bodySmall)
             }
         }
         error?.let {
@@ -338,18 +387,5 @@ private fun MiniPlayer(player: ExoPlayer, playing: Boolean, onExpand: () -> Unit
             Text("Tap to return to player", color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.bodySmall)
         }
         TextButton(onClick = onClose) { Text("×", color = Color.White, fontSize = 22.sp) }
-    }
-}
-
-@Composable
-private fun SimpleScreen(title: String, subtitle: String, detail: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, color = Navy, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = Muted)
-        }
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
-            Text(detail, Modifier.fillMaxWidth().padding(18.dp), color = Navy)
-        }
     }
 }
