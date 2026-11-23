@@ -25,6 +25,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -32,6 +35,7 @@ import java.net.URL
 fun DevicesScreen(receiverIp: String) {
     var scanStatus by remember { mutableStateOf("Ready to scan") }
     var foundReceiver by remember { mutableStateOf<String?>(null) }
+    var scanning by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -52,24 +56,26 @@ fun DevicesScreen(receiverIp: String) {
                 )
                 Text(scanStatus, color = Color(0xFF68788B), style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
                 Button(
+                    enabled = !scanning,
                     onClick = {
+                        scanning = true
                         foundReceiver = null
                         scanStatus = "Scanning local network…"
-                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                            val prefix = receiverIp.substringBeforeLast('.', "192.168.1")
-                            for (i in 1..254) {
-                                val ip = "$prefix.$i"
-                                if (probeReceiver(ip)) {
-                                    foundReceiver = ip
-                                    scanStatus = "Dreambox found: $ip"
-                                    break
+                        scope.launch {
+                            val found = withContext(Dispatchers.IO) {
+                                val prefix = receiverIp.substringBeforeLast('.', "192.168.1")
+                                (1..254).firstNotNullOfOrNull { suffix ->
+                                    val candidate = "$prefix.$suffix"
+                                    candidate.takeIf { probeReceiver(candidate) }
                                 }
                             }
-                            if (foundReceiver == null) scanStatus = "No Dreambox found on this network"
+                            foundReceiver = found
+                            scanStatus = found?.let { "Dreambox found: $it" } ?: "No Dreambox found on this network"
+                            scanning = false
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("Scan local network") }
+                ) { Text(if (scanning) "Scanning…" else "Scan local network") }
             }
         }
     }
@@ -80,9 +86,11 @@ private fun probeReceiver(host: String): Boolean = try {
         connectTimeout = 350
         readTimeout = 500
     }
-    val code = connection.responseCode
-    connection.disconnect()
-    code in 200..499
+    try {
+        connection.responseCode in 200..499
+    } finally {
+        connection.disconnect()
+    }
 } catch (_: Exception) {
     false
 }
@@ -90,32 +98,56 @@ private fun probeReceiver(host: String): Boolean = try {
 @Composable
 fun PvrScreen(receiverIp: String, username: String, password: String) {
     var status by remember { mutableStateOf("Ready") }
-    var timers by remember { mutableStateOf<List<String>>(emptyList()) }
+    var items by remember { mutableStateOf<List<String>>(emptyList()) }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("PVR / Timers", style = androidx.compose.material3.MaterialTheme.typography.headlineSmall, color = Color(0xFF102A43), fontWeight = FontWeight.Bold)
-        Text("View and manage Dreambox recordings and timers.", color = Color(0xFF68788B))
+        Text("View Dreambox recordings and timers.", color = Color(0xFF68788B))
 
         Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Color(0xFFE5EBF2))) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = {
-                        status = "Loading timers…"
-                        kotlinx.coroutines.MainScope().launch(kotlinx.coroutines.Dispatchers.IO) {
-                            timers = PvrApi.listTimers(receiverIp, username, password)
-                            status = "Loaded ${timers.size} timers"
-                        }
-                    }, modifier = Modifier.weight(1f)) { Text("Load timers") }
-                    OutlinedButton(onClick = {
-                        status = "Loading recordings…"
-                        kotlinx.coroutines.MainScope().launch(kotlinx.coroutines.Dispatchers.IO) {
-                            timers = PvrApi.listRecordings(receiverIp, username, password)
-                            status = "Loaded ${timers.size} recordings"
-                        }
-                    }, modifier = Modifier.weight(1f)) { Text("Load recordings") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        enabled = !busy && receiverIp.isNotBlank(),
+                        onClick = {
+                            busy = true
+                            status = "Loading timers…"
+                            scope.launch {
+                                try {
+                                    items = withContext(Dispatchers.IO) { PvrApi.listTimers(receiverIp, username, password) }
+                                    status = "Loaded ${items.size} timers"
+                                } catch (e: Exception) {
+                                    status = e.message ?: "Unable to load timers"
+                                } finally {
+                                    busy = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Load timers") }
+                    OutlinedButton(
+                        enabled = !busy && receiverIp.isNotBlank(),
+                        onClick = {
+                            busy = true
+                            status = "Loading recordings…"
+                            scope.launch {
+                                try {
+                                    items = withContext(Dispatchers.IO) { PvrApi.listRecordings(receiverIp, username, password) }
+                                    status = "Loaded ${items.size} recordings"
+                                } catch (e: Exception) {
+                                    status = e.message ?: "Unable to load recordings"
+                                } finally {
+                                    busy = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Load recordings") }
                 }
                 Text(status, color = Color(0xFF68788B), style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
-                timers.take(100).forEach { Text(it, color = Color(0xFF102A43), modifier = Modifier.fillMaxWidth()) }
+                items.take(100).forEach { Text(it, color = Color(0xFF102A43), modifier = Modifier.fillMaxWidth()) }
             }
         }
     }
@@ -137,6 +169,7 @@ private object PvrApi {
     }
 
     private fun request(host: String, port: Int, username: String, password: String, path: String): String {
+        require(host.isNotBlank()) { "Configure a receiver IP in Settings" }
         val connection = (URL("http://${host.trim()}:$port$path").openConnection() as HttpURLConnection).apply {
             connectTimeout = 5000
             readTimeout = 8000
