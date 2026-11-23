@@ -161,7 +161,7 @@ private fun DccApp() {
                                 onFullscreen = { fullscreen = true },
                                 onMinimize = { selected = 0 }
                             )
-                            3 -> SimpleScreen("Tools", "Receiver utilities", "FTP browser and Telnet console are not implemented in this build yet.")
+                            3 -> ToolsScreen(AppLanguage.ENGLISH, receiverIp, receiverUser, receiverPassword)
                             else -> ReceiverSettingsScreen(
                                 ip = receiverIp,
                                 onIpChange = { receiverIp = it; savedMessage = null },
