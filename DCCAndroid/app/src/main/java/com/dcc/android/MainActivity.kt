@@ -132,10 +132,12 @@ private fun DccApp() {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         when (selected) {
-                            0 -> SimpleScreen(
-                                "Your network",
-                                "Enter your receiver address and login in Settings to configure DCC.",
-                                if (receiverIp.isBlank()) "Dreambox · Not configured" else "Dreambox · $receiverIp · Saved"
+                            0 -> HomeScreen(
+                                receiverIp = receiverIp,
+                                onOpenSettings = { selected = 4 },
+                                onOpenDevices = { selected = 1 },
+                                onOpenStream = { selected = 2 },
+                                onOpenTools = { selected = 3 }
                             )
                             1 -> SimpleScreen("Devices", "Saved receiver on your network", if (receiverIp.isBlank()) "No receiver configured yet. Add its IP in Settings." else "Dreambox  ·  $receiverIp")
                             2 -> StreamScreen(
