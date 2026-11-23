@@ -4,46 +4,66 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Purple DM900 receiver background -->
+    <!-- Deep blue launch icon background -->
     <path
-        android:fillColor="#7C4DFF"
+        android:fillColor="#07152D"
         android:pathData="M0,0h108v108h-108z" />
 
-    <!-- Receiver front panel -->
+    <!-- Receiver top edge and body -->
     <path
-        android:fillColor="#102A43"
-        android:pathData="M17,28h74c4,0 7,3 7,7v46c0,4 -3,7 -7,7h-74c-4,0 -7,-3 -7,-7v-46c0,-4 3,-7 7,-7z" />
+        android:fillColor="#BFC7CF"
+        android:pathData="M14,38l12,-8h64l8,8z" />
+    <path
+        android:fillColor="#252C38"
+        android:pathData="M14,38h84v43c0,5 -4,9 -9,9h-66c-5,0 -9,-4 -9,-9z" />
 
-    <!-- Purple display -->
+    <!-- Top casing highlight -->
     <path
-        android:fillColor="#9C27B0"
-        android:pathData="M28,40h52v20h-52z" />
+        android:fillColor="#E8EDF2"
+        android:pathData="M25,31h63l7,7h-76z" />
 
-    <!-- Display highlight -->
+    <!-- Front lower face -->
     <path
-        android:fillColor="#DDBEFF"
-        android:pathData="M33,44h42v3h-42z" />
+        android:fillColor="#191F29"
+        android:pathData="M14,43h84v38c0,5 -4,9 -9,9h-66c-5,0 -9,-4 -9,-9z" />
 
-    <!-- DM900 title pixels -->
+    <!-- OLED display -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M35,54h7v4h-7z M44,54h7v4h-7z M53,54h7v4h-7z M62,54h7v4h-7z" />
+        android:fillColor="#020711"
+        android:pathData="M22,49h64v18h-64z" />
 
-    <!-- Front controls -->
+    <!-- dreambox label -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M24,76h11v4h-11z M41,76h11v4h-11z M58,76h11v4h-11z M75,76h11v4h-11z" />
+        android:fillColor="#E7EBF3"
+        android:pathData="M27,54h20v2h-20z M27,58h14v2h-14z M27,62h20v1h-20z" />
 
-    <!-- Status lights -->
+    <!-- Purple/red/green 4K indicator inspired by the reference -->
     <path
-        android:fillColor="#31C48D"
-        android:pathData="M78,70a3,3 0,1 0,6 0a3,3 0,1 0,-6 0" />
+        android:fillColor="#D62E8A"
+        android:pathData="M72,50h14v7h-14z" />
     <path
-        android:fillColor="#246BFD"
-        android:pathData="M68,70a3,3 0,1 0,6 0a3,3 0,1 0,-6 0" />
+        android:fillColor="#31D5A2"
+        android:pathData="M72,58h14v7h-14z" />
+    <path
+        android:fillColor="#FFE850"
+        android:pathData="M78,50h8v15h-8z" />
 
-    <!-- Feet -->
+    <!-- Front status details -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M24,88h12v5h-12z M72,88h12v5h-12z" />
+        android:fillColor="#5D6570"
+        android:pathData="M22,71h38v3h-38z M22,76h10v2h-10z M36,76h9v2h-9z" />
+
+    <!-- Front right controls and glowing button -->
+    <path
+        android:fillColor="#0A0E15"
+        android:pathData="M88,48h5v32h-5z" />
+    <path
+        android:fillColor="#FF5A8D"
+        android:pathData="M90,54a2,2 0,1 0,0 4a2,2 0,1 0,0 -4" />
+
+    <!-- Bottom feet -->
+    <path
+        android:fillColor="#111827"
+        android:pathData="M18,88h15v5h-15z M75,88h15v5h-15z" />
+
 </vector>
