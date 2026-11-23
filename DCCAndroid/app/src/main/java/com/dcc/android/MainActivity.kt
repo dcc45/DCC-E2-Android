@@ -109,7 +109,7 @@ private fun DccApp() {
         }
     } else {
         Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
+            containerColor = Color.Transparent,
             topBar = {
                 val title = when (selected) {
                     2 -> "Live Stream"
@@ -252,7 +252,7 @@ private fun ReceiverSettingsScreen(
             Text("Receiver settings", style = MaterialTheme.typography.headlineSmall, color = Navy, fontWeight = FontWeight.Bold)
             Text("Enter the Dreambox IP address and login details.", color = Muted)
         }
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = ip, onValueChange = onIpChange, modifier = Modifier.fillMaxWidth(),
@@ -278,6 +278,7 @@ private fun ReceiverSettingsScreen(
                 savedMessage?.let { Text(it, color = Blue, style = MaterialTheme.typography.bodyMedium) }
             }
         }
+        CustomThemeCard(context, preferences)
         BackupRestoreCard(context, preferences)
     }
 }
