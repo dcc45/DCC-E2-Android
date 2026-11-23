@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -54,23 +53,17 @@ fun HomeScreen(
             Text("Welcome to DCC", style = MaterialTheme.typography.headlineSmall, color = HomeNavy, fontWeight = FontWeight.Bold)
             Text("Your Dreambox control center", color = HomeMuted)
         }
-
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(22.dp),
             colors = CardDefaults.cardColors(containerColor = HomeNavy)
         ) {
-            Column(
-                Modifier.fillMaxWidth().padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
+            Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     androidx.compose.foundation.layout.Box(
                         Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = .12f)),
                         contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Devices, contentDescription = null, tint = Color.White)
-                    }
+                    ) { Icon(Icons.Default.Devices, contentDescription = null, tint = Color.White) }
                     Column {
                         Text("RECEIVER STATUS", color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                         Text(if (configured) "Receiver configured" else "Set up your receiver", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -78,8 +71,7 @@ fun HomeScreen(
                 }
                 Text(
                     if (configured) "Dreambox  ·  $receiverIp" else "Add your Dreambox IP address and login in Settings to get started.",
-                    color = Color.White.copy(alpha = .82f),
-                    style = MaterialTheme.typography.bodyMedium
+                    color = Color.White.copy(alpha = .82f), style = MaterialTheme.typography.bodyMedium
                 )
                 if (!configured) {
                     Button(onClick = onOpenSettings, shape = RoundedCornerShape(12.dp)) {
@@ -88,64 +80,31 @@ fun HomeScreen(
                         Text("Configure receiver")
                     }
                 } else {
-                    Text("Connection status is shown after receiver controls are connected.", color = Color.White.copy(alpha = .66f), style = MaterialTheme.typography.bodySmall)
+                    Text("Use Receiver tools to check status and manage your DM900.", color = Color.White.copy(alpha = .75f), style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
-
         Text("Quick access", style = MaterialTheme.typography.titleMedium, color = HomeNavy, fontWeight = FontWeight.Bold)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionCard(
-                title = "Devices",
-                description = "Receiver details",
-                icon = { Icon(Icons.Default.Devices, contentDescription = null, tint = HomeBlue) },
-                modifier = Modifier.weight(1f),
-                onClick = onOpenDevices
-            )
-            QuickActionCard(
-                title = "Live TV",
-                description = "Watch a stream",
-                icon = { Icon(Icons.Default.LiveTv, contentDescription = null, tint = HomeBlue) },
-                modifier = Modifier.weight(1f),
-                onClick = onOpenStream
-            )
+            QuickActionCard("Devices", "Receiver details", { Icon(Icons.Default.Devices, contentDescription = null, tint = HomeBlue) }, Modifier.weight(1f), onOpenDevices)
+            QuickActionCard("Live TV", "Watch a stream", { Icon(Icons.Default.LiveTv, contentDescription = null, tint = HomeBlue) }, Modifier.weight(1f), onOpenStream)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            QuickActionCard(
-                title = "Tools",
-                description = "Receiver utilities",
-                icon = { Icon(Icons.Default.Terminal, contentDescription = null, tint = HomeBlue) },
-                modifier = Modifier.weight(1f),
-                onClick = onOpenTools
-            )
-            QuickActionCard(
-                title = "Settings",
-                description = "Connection details",
-                icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = HomeBlue) },
-                modifier = Modifier.weight(1f),
-                onClick = onOpenSettings
-            )
+            QuickActionCard("Tools", "Receiver utilities", { Icon(Icons.Default.Terminal, contentDescription = null, tint = HomeBlue) }, Modifier.weight(1f), onOpenTools)
+            QuickActionCard("Settings", "Connection details", { Icon(Icons.Default.Settings, contentDescription = null, tint = HomeBlue) }, Modifier.weight(1f), onOpenSettings)
         }
-
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            border = BorderStroke(1.dp, HomeBorder)
+            modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(1.dp, HomeBorder)
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Getting started", color = HomeNavy, fontWeight = FontWeight.Bold)
                 Text(
-                    if (configured) "Your receiver details are saved on this device. Choose Live TV to enter a stream URL, or open Tools for receiver utilities.
-                    " else "Configure your receiver to get started. Then use Live TV to enter a stream URL or explore the other tabs.",
-                    color = HomeMuted,
-                    style = MaterialTheme.typography.bodyMedium
+                    if (configured) "Receiver details are saved on this device. Open Tools to check signal, browse files, capture a screenshot, or perform maintenance."
+                    else "Configure your receiver to get started. Then use Live TV to enter a stream URL or explore the other tabs.",
+                    color = HomeMuted, style = MaterialTheme.typography.bodyMedium
                 )
-                if (configured) {
-                    OutlinedButton(onClick = onOpenSettings, modifier = Modifier.padding(top = 4.dp)) {
-                        Text("Edit receiver settings")
-                    }
-                }
+                if (configured) OutlinedButton(onClick = onOpenSettings, modifier = Modifier.padding(top = 4.dp)) { Text("Edit receiver settings") }
             }
         }
     }
@@ -160,18 +119,12 @@ private fun QuickActionCard(
     onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, HomeBorder)
+        modifier = modifier.clickable(onClick = onClick), shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(1.dp, HomeBorder)
     ) {
-        Column(
-            Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             androidx.compose.foundation.layout.Box(
-                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFEAF1FF)),
-                contentAlignment = Alignment.Center
+                Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFEAF1FF)), contentAlignment = Alignment.Center
             ) { icon() }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, color = HomeNavy, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
