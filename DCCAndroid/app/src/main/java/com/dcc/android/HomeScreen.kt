@@ -47,6 +47,11 @@ fun HomeScreen(
     onOpenTools: () -> Unit
 ) {
     val configured = receiverIp.isNotBlank()
+    val gettingStartedText = if (configured) {
+        "Receiver details are saved on this device. Open Tools to check signal, browse files, capture a screenshot, or perform maintenance."
+    } else {
+        "Configure your receiver to get started. Then use Live TV to enter a stream URL or explore the other tabs."
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -99,12 +104,12 @@ fun HomeScreen(
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Getting started", color = HomeNavy, fontWeight = FontWeight.Bold)
-                Text(
-                    if (configured) "Receiver details are saved on this device. Open Tools to check signal, browse files, capture a screenshot, or perform maintenance."
-                    else "Configure your receiver to get started. Then use Live TV to enter a stream URL or explore the other tabs.",
-                    color = HomeMuted, style = MaterialTheme.typography.bodyMedium
-                )
-                if (configured) OutlinedButton(onClick = onOpenSettings, modifier = Modifier.padding(top = 4.dp)) { Text("Edit receiver settings") }
+                Text(gettingStartedText, color = HomeMuted, style = MaterialTheme.typography.bodyMedium)
+                if (configured) {
+                    OutlinedButton(onClick = onOpenSettings, modifier = Modifier.padding(top = 4.dp)) {
+                        Text("Edit receiver settings")
+                    }
+                }
             }
         }
     }
