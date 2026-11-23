@@ -12,10 +12,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.SettingsInputAntenna
@@ -103,7 +101,7 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
         }
     }
 
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("DM900 receiver tools", style = MaterialTheme.typography.headlineSmall, color = ToolsNavy, fontWeight = FontWeight.Bold)
             Text("Diagnostics, read-only FTP browsing, screenshots, and maintenance.", color = ToolsMuted)
