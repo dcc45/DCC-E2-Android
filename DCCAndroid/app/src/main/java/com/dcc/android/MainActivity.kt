@@ -2,6 +2,7 @@ package com.dcc.android
 
 import android.net.Uri
 import android.os.Bundle
+import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -29,7 +30,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 
@@ -50,7 +53,6 @@ class MainActivity : ComponentActivity() {
 private fun DccApp() {
     var selected by remember { mutableIntStateOf(0) }
     var streamUrl by remember { mutableStateOf("") }
-    var urlInput by remember { mutableStateOf("") }
     var listenUrl by remember { mutableStateOf("") }
     var listenUrlInput by remember { mutableStateOf("") }
     var listenError by remember { mutableStateOf<String?>(null) }
@@ -61,16 +63,46 @@ private fun DccApp() {
     var receiverIp by remember { mutableStateOf(preferences.getString("ip", "") ?: "") }
     var receiverUser by remember { mutableStateOf(preferences.getString("user", "root") ?: "root") }
     var receiverPassword by remember { mutableStateOf(preferences.getString("password", "") ?: "") }
+    var urlInput by remember(receiverIp) {
+        mutableStateOf(if (receiverIp.isBlank()) "" else "http://${receiverIp.trim()}:8001/")
+    }
     var savedMessage by remember { mutableStateOf<String?>(null) }
-    val player = remember { ExoPlayer.Builder(context).build() }
+
+    val httpFactory = remember(receiverUser, receiverPassword) {
+        val factory = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(10_000)
+            .setReadTimeoutMs(15_000)
+        if (receiverUser.isNotBlank()) {
+            val credentials = Base64.encodeToString(
+                "$receiverUser:$receiverPassword".toByteArray(Charsets.UTF_8),
+                Base64.NO_WRAP
+            )
+            factory.setDefaultRequestProperties(mapOf("Authorization" to "Basic $credentials"))
+        }
+        factory
+    }
+    val mediaSourceFactory = remember(httpFactory) {
+        DefaultMediaSourceFactory(context).setDataSourceFactory(httpFactory)
+    }
+    val player = remember(mediaSourceFactory) {
+        ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
+    }
     var isPlaying by remember { mutableStateOf(false) }
 
     DisposableEffect(player) {
         val listener = object : androidx.media3.common.Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
             override fun onPlayerError(playbackError: androidx.media3.common.PlaybackException) {
-                if (selected == 6) listenError = "Unable to play this audio stream. Check the URL and receiver connection."
-                else error = "Unable to play this stream. Check the URL and receiver connection."
+                val detail = playbackError.localizedMessage
+                    ?: playbackError.cause?.message
+                    ?: "Playback error ${playbackError.errorCode}"
+                val message = if (selected == 6) {
+                    "Unable to play this audio stream: $detail"
+                } else {
+                    "Unable to play this stream: $detail"
+                }
+                if (selected == 6) listenError = message else error = message
             }
         }
         player.addListener(listener)
@@ -171,9 +203,9 @@ private fun ReceiverSettingsScreen(ip: String, onIpChange: (String) -> Unit, use
         }
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = ip, onValueChange = onIpChange, modifier = Modifier.fillMaxWidth(), label = { Text("Receiver IP address or hostname") }, placeholder = { Text("192.168.1.4") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), shape = RoundedCornerShape(14.dp))
-                OutlinedTextField(value = username, onValueChange = onUsernameChange, modifier = Modifier.fillMaxWidth(), label = { Text("Username") }, placeholder = { Text("root") }, singleLine = true, shape = RoundedCornerShape(14.dp))
-                OutlinedTextField(value = password, onValueChange = onPasswordChange, modifier = Modifier.fillMaxWidth(), label = { Text("Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), shape = RoundedCornerShape(14.dp))
+                OutlinedTextField(value = ip, onValueChange = onIpChange, modifier = Modifier.fillMaxWidth(), label = { Text("Receiver IP address or hostname") }, placeholder = { Text("192.168.1.104") }, singleLine = true)
+                OutlinedTextField(value = username, onValueChange = onUsernameChange, modifier = Modifier.fillMaxWidth(), label = { Text("Username") }, placeholder = { Text("root") }, singleLine = true)
+                OutlinedTextField(value = password, onValueChange = onPasswordChange, modifier = Modifier.fillMaxWidth(), label = { Text("Password") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
                 Button(onClick = onSave, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Text("Save receiver settings") }
                 savedMessage?.let { Text(it, color = Blue, style = MaterialTheme.typography.bodyMedium) }
             }
@@ -225,11 +257,11 @@ private fun StreamScreen(player: ExoPlayer, streamUrl: String, urlInput: String,
                     value = rawUrl(urlInput),
                     onValueChange = { raw -> val clean = rawUrl(raw.trim()); onUrlChange(if (clean.isBlank()) "" else "${protocol.lowercase()}://$clean") },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
-                    placeholder = { Text(if (protocol == "HTTPS") "192.168.1.104:8001/stream" else "192.168.1.104:8001/stream") },
+                    placeholder = { Text("192.168.31.181:8001/<service-reference>") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), shape = RoundedCornerShape(14.dp)
                 )
                 Button(onClick = onPlay, modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(14.dp)) { Text(if (streamUrl.isBlank()) "Connect and play" else "Play stream") }
-                Text("Choose HTTP or HTTPS, then enter the receiver IP and video stream path.", color = Muted, style = MaterialTheme.typography.bodySmall)
+                Text("Enigma2 service streaming port is usually 8001.", color = Muted, style = MaterialTheme.typography.bodySmall)
             }
         }
         error?.let { Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F0))) { Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(it, color = Color(0xFF9C2F26), modifier = Modifier.weight(1f)); TextButton(onClick = onErrorDismiss) { Text("OK") } } } }
@@ -247,7 +279,7 @@ private fun MiniPlayer(player: ExoPlayer, playing: Boolean, onExpand: () -> Unit
     Row(Modifier.fillMaxWidth().background(Color(0xFF102A43)).clickable(onClick = onExpand).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
         PlayerSurface(player, Modifier.width(112.dp).height(64.dp).clip(RoundedCornerShape(8.dp)))
         Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) { Text(if (playing) "LIVE · Dreambox" else "Stream paused", color = Color.White, fontWeight = FontWeight.Bold); Text("Tap to return to player", color = Color.White.copy(alpha = .7f), style = MaterialTheme.typography.bodySmall) }
+        Column(Modifier.weight(1f)) { Text(if (playing) "LIVE · Dreambox" else "Stream paused", color = Color.White, fontWeight = FontWeight.Bold); Text("Tap to return to player", color = Color.White.copy(alpha = .72f)) }
         TextButton(onClick = onClose) { Text("×", color = Color.White, fontSize = 22.sp) }
     }
 }
