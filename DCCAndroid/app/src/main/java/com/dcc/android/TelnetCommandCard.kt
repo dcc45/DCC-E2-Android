@@ -33,6 +33,10 @@ import java.io.ByteArrayOutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 
+private val TelnetNavy = Color(0xFF102A43)
+private val TelnetMuted = Color(0xFF68788B)
+private val TelnetBorder = Color(0xFFE5EBF2)
+
 @Composable
 fun TelnetCommandCard(host: String, username: String, password: String) {
     var port by remember { mutableStateOf("23") }
@@ -44,27 +48,25 @@ fun TelnetCommandCard(host: String, username: String, password: String) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, ToolsBorder)
+        border = BorderStroke(1.dp, TelnetBorder)
     ) {
         Column(
             Modifier.fillMaxWidth().padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Telnet command console", color = ToolsNavy, fontWeight = FontWeight.Bold)
+            Text("Telnet command console", color = TelnetNavy, fontWeight = FontWeight.Bold)
             Text(
                 "Connects using the receiver login details, sends one command, and displays the result.",
-                color = ToolsMuted
+                color = TelnetMuted
             )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = port,
-                    onValueChange = { port = it.filter(Char::isDigit).take(5) },
-                    modifier = Modifier.weight(1f),
-                    label = { Text("Telnet port") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-            }
+            OutlinedTextField(
+                value = port,
+                onValueChange = { port = it.filter(Char::isDigit).take(5) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Telnet port") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
             OutlinedTextField(
                 value = command,
                 onValueChange = { command = it },
@@ -95,7 +97,7 @@ fun TelnetCommandCard(host: String, username: String, password: String) {
             ) { Text(if (busy) "Running…" else "Send command") }
             Text(
                 output,
-                color = ToolsMuted,
+                color = TelnetMuted,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
             )
         }
@@ -124,14 +126,14 @@ private object TelnetCommander {
                 val input = socket.getInputStream().buffered()
                 val output = BufferedOutputStream(socket.getOutputStream())
 
-                var sessionText = StringBuilder()
-                sessionText.append(readAvailable(input, socket.soTimeout, 1500))
+                val sessionText = StringBuilder()
+                sessionText.append(readAvailable(input, 1500))
 
                 if (username.isNotBlank()) {
                     val loginPrompt = sessionText.toString().lowercase()
                     if (Regex("login|username").containsMatchIn(loginPrompt)) {
                         output.write((username + "\r\n").toByteArray(Charsets.UTF_8)); output.flush()
-                        sessionText.append(readAvailable(input, socket.soTimeout, 1000))
+                        sessionText.append(readAvailable(input, 1000))
                         val passwordPrompt = sessionText.toString().lowercase()
                         if (Regex("password").containsMatchIn(passwordPrompt)) {
                             output.write((password + "\r\n").toByteArray(Charsets.UTF_8)); output.flush()
@@ -140,7 +142,7 @@ private object TelnetCommander {
                 }
 
                 output.write((command + "\r\n").toByteArray(Charsets.UTF_8)); output.flush()
-                val commandOutput = readAvailable(input, socket.soTimeout, 3500)
+                val commandOutput = readAvailable(input, 3500)
 
                 cleanTelnet("$sessionText$commandOutput").trim().ifBlank {
                     "Command sent, but no text response was received."
@@ -151,7 +153,7 @@ private object TelnetCommander {
         }
     }
 
-    private fun readAvailable(input: java.io.InputStream, timeoutMs: Int, waitMs: Long): String {
+    private fun readAvailable(input: java.io.InputStream, waitMs: Long): String {
         val bytes = ByteArrayOutputStream()
         val buffer = ByteArray(1024)
         val end = System.currentTimeMillis() + waitMs
