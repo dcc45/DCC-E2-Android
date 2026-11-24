@@ -32,6 +32,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 
@@ -81,7 +82,12 @@ private fun DccApp() {
         }
         factory
     }
-    val player = remember(httpFactory) { ExoPlayer.Builder(context, httpFactory).build() }
+    val mediaSourceFactory = remember(httpFactory) {
+        DefaultMediaSourceFactory(context).setDataSourceFactory(httpFactory)
+    }
+    val player = remember(mediaSourceFactory) {
+        ExoPlayer.Builder(context).setMediaSourceFactory(mediaSourceFactory).build()
+    }
     var isPlaying by remember { mutableStateOf(false) }
 
     DisposableEffect(player) {
@@ -195,7 +201,7 @@ private fun ReceiverSettingsScreen(ip: String, onIpChange: (String) -> Unit, use
             Text("Receiver settings", style = MaterialTheme.typography.headlineSmall, color = Navy, fontWeight = FontWeight.Bold)
             Text("Enter the Dreambox IP address and login details.", color = Muted)
         }
-        Card(colors = CardDefaults.cardCardsColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(value = ip, onValueChange = onIpChange, modifier = Modifier.fillMaxWidth(), label = { Text("Receiver IP address or hostname") }, placeholder = { Text("192.168.1.104") }, singleLine = true)
                 OutlinedTextField(value = username, onValueChange = onUsernameChange, modifier = Modifier.fillMaxWidth(), label = { Text("Username") }, placeholder = { Text("root") }, singleLine = true)
@@ -239,7 +245,7 @@ private fun StreamScreen(player: ExoPlayer, streamUrl: String, urlInput: String,
                 }
             }
         }
-        Card(colors = CardDefaults.cardCardsColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, Border)) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Dreambox stream URL", color = Navy, fontWeight = FontWeight.Bold)
                 Text("Protocol", color = Muted, style = MaterialTheme.typography.labelMedium)
@@ -258,7 +264,7 @@ private fun StreamScreen(player: ExoPlayer, streamUrl: String, urlInput: String,
                 Text("Enigma2 service streaming port is usually 8001.", color = Muted, style = MaterialTheme.typography.bodySmall)
             }
         }
-        error?.let { Card(colors = CardDefaults.cardCardsColors(containerColor = Color(0xFFFFF1F0))) { Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(it, color = Color(0xFF9C2F26), modifier = Modifier.weight(1f)); TextButton(onClick = onErrorDismiss) { Text("OK") } } } }
+        error?.let { Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF1F0))) { Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Text(it, color = Color(0xFF9C2F26), modifier = Modifier.weight(1f)); TextButton(onClick = onErrorDismiss) { Text("OK") } } } }
     }
 }
 
