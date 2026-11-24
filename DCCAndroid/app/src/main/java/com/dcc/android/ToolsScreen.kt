@@ -50,8 +50,6 @@ import org.apache.commons.net.ftp.FTPClient
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.InetSocketAddress
-import java.net.Socket
 import java.net.URL
 import java.time.Duration
 
@@ -74,7 +72,6 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
     var host by remember(receiverIp) { mutableStateOf(receiverIp) }
     var webPort by remember { mutableStateOf("80") }
     var ftpPort by remember { mutableStateOf("21") }
-    var telnetPort by remember { mutableStateOf("23") }
     var snapshot by remember { mutableStateOf<ReceiverSnapshot?>(null) }
     var status by remember { mutableStateOf("Not connected") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -85,7 +82,6 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
     var ftpPath by remember { mutableStateOf("/") }
     var ftpConnected by remember { mutableStateOf(false) }
     var ftpStatus by remember { mutableStateOf("FTP not connected") }
-    var telnetStatus by remember { mutableStateOf("Telnet not checked") }
     val scope = rememberCoroutineScope()
 
     fun launchIo(action: suspend () -> Unit) {
@@ -148,12 +144,7 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                     Text(info.signal, color = ToolsNavy, fontWeight = FontWeight.SemiBold)
                     val signalPercent = remember(info.signal) { Enigma2Client.signalPercent(info.signal) }
                     if (signalPercent != null) {
-                        LinearProgressIndicator(
-                            progress = { signalPercent / 100f },
-                            modifier = Modifier.fillMaxWidth().height(10.dp),
-                            color = ToolsPurple,
-                            trackColor = ToolsPurple.copy(alpha = 0.18f)
-                        )
+                        LinearProgressIndicator(progress = { signalPercent / 100f }, modifier = Modifier.fillMaxWidth().height(10.dp), color = ToolsPurple, trackColor = ToolsPurple.copy(alpha = 0.18f))
                         Text("Signal strength: $signalPercent%", color = ToolsPurple, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                     }
                 }
@@ -168,24 +159,14 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
                 }
                 Text("Capture the receiver on-screen image via the Web Interface.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
                 OutlinedButton(enabled = !busy && host.isNotBlank(), onClick = {
-                    launchIo { screenshot = withContext(Dispatchers.IO) { Enigma2Client.screenshot(host, webPort.toIntOrNull() ?: 80, username, password) }
-                    }
+                    launchIo { screenshot = withContext(Dispatchers.IO) { Enigma2Client.screenshot(host, webPort.toIntOrNull() ?: 80, username, password) } }
                 }, modifier = Modifier.fillMaxWidth()) { Text("Capture screenshot") }
                 screenshot?.let { Image(it.asImageBitmap(), contentDescription = "Receiver screenshot", modifier = Modifier.fillMaxWidth().height(220.dp)) }
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, ToolsBorder)) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Telnet diagnostics", color = ToolsNavy, fontWeight = FontWeight.Bold)
-                Text("Checks only whether the port is reachable. No login or commands are sent.", color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(telnetPort, { telnetPort = it.filter(Char::isDigit).take(5) }, Modifier.fillMaxWidth(), label = { Text("Telnet port") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-                OutlinedButton(enabled = !busy && host.isNotBlank(), onClick = {
-                    launchIo { telnetStatus = withContext(Dispatchers.IO) { TelnetDiagnostics.check(host, telnetPort.toIntOrNull() ?: 23) } }
-                }) { Text("Test Telnet port") }
-                Text(telnetStatus, color = ToolsMuted, style = MaterialTheme.typography.bodySmall)
-            }
-        }
+        // The command console is now part of the Tools screen instead of the previous port-only check.
+        TelnetCommandCard(host = host, username = username, password = password)
 
         Card(colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(20.dp), border = BorderStroke(1.dp, ToolsBorder)) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -263,18 +244,6 @@ fun ToolsScreen(language: AppLanguage, receiverIp: String, username: String, pas
     }
 }
 
-private object TelnetDiagnostics {
-    fun check(host: String, port: Int): String {
-        if (host.isBlank() || port !in 1..65535) return "Enter a valid host and port"
-        return try {
-            Socket().use { it.connect(InetSocketAddress(host.trim(), port), 3000) }
-            "Port $port is reachable; no login or commands sent."
-        } catch (_: Exception) {
-            "Port $port is not reachable."
-        }
-    }
-}
-
 private object Enigma2Client {
     private const val MAX_RESPONSE_BYTES = 5 * 1024 * 1024
 
@@ -293,8 +262,6 @@ private object Enigma2Client {
     fun signalPercent(signal: String): Int? {
         val snr = Regex("\\bSNR\\s*:\\s*(\\d+(?:\\.\\d+)?)", RegexOption.IGNORE_CASE)
             .find(signal)?.groupValues?.get(1)?.toFloatOrNull() ?: return null
-        // Web Interface SNR is commonly reported as a 0–100 percentage; clamp
-        // just in case a receiver reports a value outside that range.
         return snr.toInt().coerceIn(0, 100)
     }
 
